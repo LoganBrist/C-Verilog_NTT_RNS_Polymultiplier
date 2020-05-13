@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include "REDC.h"
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -50,6 +51,7 @@ class RNS
         // Variables
         std::vector<int> moduli;    //base of coprimes
         std::vector<int> weights;   //int values of 1|0|0, 0|1|0, etc.
+        std::vector<REDC> redc;     //montgomery reduction function for each moduli
         int dR;                     //dynamic range 
         int n_moduli;               //number of coprimes 
 

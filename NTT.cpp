@@ -278,117 +278,7 @@ vector<int> NTT::stupidcalculate(vector<int> A, bool inverse) {;
 }
 
 
-///////////////////////////////////////////////////////////////////////////////
-// NTT1  (not working)
-// 
-// Has to be power of 2
-///////////////////////////////////////////////////////////////////////////////
-vector<int> NTT::calculate(vector<int> A, bool inverse) {
-    vector<int> Z; //return polynomial
 
-    int vec_len = A.size();  //This should be same as NTT.vec_length but just in case
-
-    Z = bitReverse(A);
-
-    int omeg = w_n;
-    if (inverse)
-        omeg = w_n_inv;
-    for (int m = 2; m <= vec_len; m *= 2) {
-        int w_m = pow_mod(omeg, vec_len / m, modulus);
-        int w = 1;
-
-        for (int j = 0; j < m / 2; j++) {
-            for (int k = 0; k < vec_len; k += m) {
-                //butterfly
-                int V = (w * Z[k + j + m / 2]) % modulus;
-                int U = Z[k + j];
-                Z[k + j] = (U + V) % modulus;
-                Z[k + j + m / 2] = (U - V + modulus) % modulus;
-            }
-            w *= (w_m % modulus);
-        }
-    }
-
-    if(inverse)
-        Z = hadamard_product(Z, constant_vector(vec_len, mod_inverse(vec_len, modulus)), modulus);
-
-    return Z;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// NTT2 (not working)
-// Based on "Speeding up the Number Theoretic Transform
-// for Faster Ideal Lattice - Based Cryptography"
-//
-// Has to be power of 2
-///////////////////////////////////////////////////////////////////////////////
-vector<int> NTT::calculate2(vector<int> A, bool inverse) {
-    vector<int> Z = A; //return polynomial
-
-    int vec_len = A.size();  //This should be same as NTT.vec_length but just in case
-    int spread = vec_len;
-
-    for (int m = 1; m < vec_len; m *= 2) {
-        spread /= 2;
-        for (int i = 0; i < m; i++) {
-            int j1 = 2 * i * spread;
-            int j2 = j1 + spread - 1;
-            int S  = phi_table[m + i];
-
-            for (int j = j1; j <= j2; j++) {
-                //butterfly
-                int U = A[j];
-                int V = (A[j + spread] * S) % modulus;
-
-                Z[j] = (U + V) % modulus;
-                Z[j + spread] = (U - V + modulus) % modulus;
-            }
-        }
-    }
-
-    if (inverse)
-        Z = hadamard_product(Z, constant_vector(vec_len, mod_inverse(vec_len, modulus)), modulus);
-
-    //Z = bitReverse(Z);
-    return Z;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// NTT3 
-// Based on Popelmann thesis
-///////////////////////////////////////////////////////////////////////////////
-vector<int> NTT::calculate3(vector<int> A, bool inverse) {
-    int n = A.size();
-    A = bitReverse(A);
-    int N = n;
-    int m = 2;
-    int omeg = w_n;
-    if (inverse)
-        omeg = w_n_inv;
-
-    while (m <= N) {
-        int s = 0;
-        while (s < N) {
-            for (int i = 0; i < m / 2; i++) {
-                N = i * n / m;
-                int a = s + i;
-                int b = s + i + m / 2;
-                int c = A[a];
-                int d = A[b];
-                int twid = pow_mod(omeg, N, modulus);
-                A[a] = (c + (twid * d)) % modulus;
-                A[b] = (c - (twid * d) + modulus) % modulus;
-            }
-            s = s * m;
-        }
-        m = m * 2;
-    }
-
-    //scale by n^-1
-    if(inverse)
-        A = hadamard_product(A, constant_vector(n, mod_inverse(n, modulus)), modulus);
-    return A;
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 // NTT4 (working)
@@ -488,6 +378,56 @@ vector<int> NTT::calculate5(vector<int> A, bool inverse) {
     return A;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// NTT6 
+// Based on Nayuki radix2, with RNS and montgomery reduction
+///////////////////////////////////////////////////////////////////////////////
+vector<int> NTT::calculate6(vector<int> A, bool inverse) {
+    int n = A.size();
+    int levels = log2(n);
+
+    vector<int> powtable;
+
+    int temp = 1;
+    int omeg = w_n;
+    if (inverse)
+        omeg = w_n_inv;
+
+    for (int i = 0; i < n / 2; i++) {
+        powtable.push_back(temp);
+        temp = rns.mult(temp, omeg) % modulus; //temp * omeg % modulus;
+    }
+
+    A = bitReverse(A);
+
+    int size = 2;
+    int count = 0;
+    while (size <= n) {
+        int halfsize = size / 2;
+        int tablestep = n / size;
+
+        for (int i = 0; i < n; i += size) {
+            int  k = 0;
+            for (int j = i; j < i + halfsize; j++) {
+
+                int l = j + halfsize;
+                int left = A[j];
+                int right = rns.mult(A[l], powtable[k]) % modulus; //(A[l] * powtable[k]) % modulus;
+                A[j] = (left + right) % modulus;
+                A[l] = (left - right + modulus) % modulus;
+                k += tablestep;
+            }
+            count++;
+            cout << count * 100 / n << "% of butterfly NTT done.\r";
+        }
+
+        size += size;  // size = size * 2
+    }
+    cout << "100% of butterfly NTT done." << endl;
+    if (inverse)
+        A = hadamard_product(A, constant_vector(n, mod_inverse(n, modulus)), modulus);
+    return A;
+}
 ///////////////////////////////////////////////////////////////////////////////
 // Constructor
 ///////////////////////////////////////////////////////////////////////////////

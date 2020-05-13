@@ -30,21 +30,28 @@ int REDC::reduce(int val,int mod) {
 }
 
 //////////////////////////////////////////////////////////////
-// Outer function
+// Outer function\
 //
 // R is an initialization parameter. It is a power of 2 to allow
 // for bitshifts.
+
+// Montgomery reduction is only better when the same modulus is reused
+// 
 //////////////////////////////////////////////////////////////
-int REDC::modmult(int A, int B, int mod) {
+int REDC::modmult(int A, int B) {
+	// Do not perform montgomery reduction
+	if (modIsEven)
+		return A * B % modulus;
+
 	// Convert to montgomery form
-	int a = (A << R_bits) % mod;   //efficient multiply A by R
-	int b = (B << R_bits) % mod;   //efficient multiply B by R
+	int a = (A << R_bits) % modulus;   //efficient bitshift multiply A by R
+	int b = (B << R_bits) % modulus;   //efficient bitshift multiply B by R
 	 
 	//main efficient montgomery reduction
-	int c = reduce(a * b, mod); 
+	int c = reduce(a * b, modulus); 
 
 	// Convert to standard form
-	int ans = (c * R_inv) % mod;
+	int ans = (c * R_inv) % modulus;
 
 	return ans;
 }
@@ -56,8 +63,8 @@ bool REDC::test() {
 	bool error = false;
 	for (int i = 0; i < modulus; i++) {
 		for (int j = 0; j < modulus; j++) {
-			if (modmult(i, j, modulus) != (i * j % modulus)) {
-				cout << i << " x " << j << " != " << modmult(i, j, modulus) << " = " << (i * j % modulus) << endl;
+			if (modmult(i, j) != (i * j % modulus)) {
+				cout << i << " x " << j << " != " << modmult(i, j) << " = " << (i * j % modulus) << endl;
 				error = true;
 			}
 		}
@@ -102,22 +109,27 @@ bool REDC::areCoprimes(int A, int B) {
 //////////////////////////////////////////////////////////////
 // Error
 //////////////////////////////////////////////////////////////
-void isPrimeException(int val) {
-	if (factorize(val).size() != 1) {
-		cout << "REDC Error: Modulus " << val << " is not prime." << endl;
-		throw;
+bool isOdd(int val) {
+	return (val % 2 != 0); 
 	}
-}
 
 //////////////////////////////////////////////////////////////
 // Constructor
 //////////////////////////////////////////////////////////////
 REDC::REDC(int mod) {
-	isPrimeException(mod);
+	// Mod must be odd to use montgomery reduction.
+	//(It allows R and mod to be coprime while R is a power of 2)
+	if (isOdd(mod)) {
+		R      = findR(mod);
+		R_inv  = mod_inverse(R, mod);
+		R_bits = log2(R);
+		K      = findK(R, R_inv, mod);
+	}
+	else {
+		R         = mod;
+		modIsEven = true;
+		cout << "Montgomery reduction not used. Cannot use even modulus " << mod << "." << endl;
+	}
+
 	modulus = mod;
-	R       = findR(mod);
-	R_inv   = mod_inverse(R, mod);
-	R_bits  = log2(R);
-	K       = findK(R, R_inv, mod);
-	mod     = mod;
 }

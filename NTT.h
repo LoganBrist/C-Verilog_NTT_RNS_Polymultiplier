@@ -21,11 +21,12 @@ class NTT
 		NTT(int vector_length, int minimum_modulus, RNS RNS_system);   //constructor
 		
 		int new_modulus(int vec_length, int min_modulus);
-		std::vector<int> calculate(std::vector<int> A, bool inverse = false);
-		std::vector<int> calculate2(std::vector<int> A, bool inverse = false);
-		std::vector<int> calculate3(std::vector<int> A, bool inverse = false);
+		//std::vector<int> calculate(std::vector<int> A, bool inverse = false);
+		//std::vector<int> calculate2(std::vector<int> A, bool inverse = false);
+		//std::vector<int> calculate3(std::vector<int> A, bool inverse = false);
 		std::vector<int> calculate4(std::vector<int> A, bool inverse = false);
 		std::vector<int> calculate5(std::vector<int> A, bool inverse = false);
+		std::vector<int> calculate6(std::vector<int> A, bool inverse = false);
 		std::vector<int> stupidcalculate(std::vector<int> A, bool inverse = false);
 		int find_root_of_unity2(int vec_length, int modulus);
 		void printParameters();

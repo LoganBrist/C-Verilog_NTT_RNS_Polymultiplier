@@ -30,6 +30,19 @@ vector<int> hadamard_product(vector<int> a, vector<int> b, int moduli) {
     return Z;
 }
 
+//////////////////////////////////////////////////////////////////////////////
+// RNS Modular Hadamard Product with reduction
+// pointwise modular multiplication between vectors (to use RNS_mult function later)
+///////////////////////////////////////////////////////////////////////////////
+vector<int> rns_hadamard_product(vector<int> a, vector<int> b, int moduli) {
+    vector<int> Z;
+
+    for (int i = 0; i < a.size(); i++) {
+        Z.push_back((a[i] * b[i]) % moduli);  //RNS_mod_multiply(a[i],b[i],moduli)
+    }
+
+    return Z;
+}
 ///////////////////////////////////////////////////////////////////////////////
 // Sample Polynomial
 // Returns uniformly random polynomial of length N in ring q

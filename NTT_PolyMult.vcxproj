@@ -151,6 +151,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="general_functions.cpp" />
     <ClCompile Include="NTT.cpp" />
+    <ClCompile Include="processor.cpp" />
     <ClCompile Include="REDC.cpp" />
     <ClCompile Include="RNS.cpp" />
   </ItemGroup>
@@ -158,6 +159,7 @@
     <ClInclude Include="bigint.h" />
     <ClInclude Include="general_functions.h" />
     <ClInclude Include="NTT.h" />
+    <ClInclude Include="processor.h" />
     <ClInclude Include="REDC.h" />
     <ClInclude Include="RNS.h" />
   </ItemGroup>

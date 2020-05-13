@@ -2,6 +2,7 @@
 #include <vector>
 #include "general_functions.h"
 #include <iostream>
+#include "REDC.h"
 
 using namespace std;
 
@@ -60,7 +61,7 @@ int RNS::reverseConverter(vector<int> num_RNS) {
     int ret_val         = 0;
     for (int i = 0; i < n_moduli; i++) {
         ret_val += weights[i] * num_RNS[i];
-        ret_val %= dR;
+        ret_val %= dR;  
     }
 
     return int(ret_val);
@@ -95,7 +96,9 @@ vector<int> RNS::mult_RNS(vector<int> A, vector<int> B) {
     vector<int> ret_val;
     for (int i = 0; i < n_moduli; i++) {
         //cout << A[i] << " * " << B[i] << " mod " << moduli[i] << " = " << (A[i] * B[i]) % moduli[i] << endl;
-        ret_val.push_back((A[i] * B[i]) % moduli[i]);
+        
+        //ret_val.push_back((A[i] * B[i]) % moduli[i]); //standard reduction
+        ret_val.push_back(redc[i].modmult(A[i], B[i])); //montgomery reduction
     }
 
     return ret_val;
@@ -131,4 +134,10 @@ RNS::RNS(vector<int> mod) {
     n_moduli = mod.size();
     dR = getDynamicRange(); 
     weights = getSingleResidues();
+
+    // create montgomery reduction module for each moduli
+    for (int i = 0; i < mod.size(); i++) {
+        REDC redc_module(mod[i]);
+        redc.push_back(redc_module);
+    }
 }

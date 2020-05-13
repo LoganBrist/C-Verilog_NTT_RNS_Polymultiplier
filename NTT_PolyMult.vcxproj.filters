@@ -33,6 +33,9 @@
     <ClCompile Include="REDC.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="processor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="general_functions.h">
@@ -48,6 +51,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="REDC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="processor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
