@@ -2,6 +2,8 @@
 #include <vector>
 #include <string>
 #include "BigIntLibrary/BigIntegerLibrary.hh"
+#include <fstream>
+#include <iomanip>
 
 using namespace std;
 
@@ -223,6 +225,48 @@ void printVector(vector<BigUnsigned> list, string name, bool printFullVector) {
         }
         cout << endl;
     }
+}
+
+///////////////////////////////////////////////////////////////
+// Save vector to text file
+// 
+///////////////////////////////////////////////////////////////
+void saveValToTextfile(BigUnsigned val, string savename) {
+    ofstream file;
+    file.open(savename);
+    file << hex << setfill('0') << val << "\n";
+    file.close();
+}
+
+void saveVectorToTextfile(vector<BigUnsigned> vec, string savename, bool WriteOnOneLine, int val_width) {
+    ofstream file;
+    file.open(savename);
+    
+    if (WriteOnOneLine) {
+        for (int i = 0; i < vec.size(); i++) {
+            file << hex << setfill('0') << setw(val_width) << vec[i] << "\n";
+        }
+    }
+
+    else {
+        for (int i = 0; i < vec.size(); i++) {
+            file << hex << setfill('0') << vec[i] << "\n";
+        }
+    }
+
+    file.close();
+}
+
+void saveVectorVectorToTextfile(vector<vector<BigUnsigned>> vec, string savename) {
+    ofstream file;
+    file.open(savename);
+
+    for (int i = 0; i < vec.size(); i++) {
+        for (int j = 0; j < vec[i].size(); j++) {
+            file << hex << setfill('0') << vec[i][j] << "\n";
+        }
+    }
+    file.close();
 }
 
 ///////////////////////////////////////////////////////////////
