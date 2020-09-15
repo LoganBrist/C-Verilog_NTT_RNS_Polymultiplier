@@ -186,12 +186,12 @@ vector<BigUnsigned> negative_wrapped_convolution(vector<BigUnsigned> A, vector<B
 int main()
 {
     //Input parameters
-    BigUnsigned length = 8;                   /* Length of polynomial. Needs to be power of 2 and needs to be
+    BigUnsigned length = 256;                   /*8 Length of polynomial. Needs to be power of 2 and needs to be
                                                 compatible with the chosen modulus otherwise errors occur. It is 
                                                 consistently 128,256,512 for moduli of 3329,7681,12289 in lattice
                                                 crptography papers and around 4096 (2^12) in FHE papers. */
 
-    BigUnsigned minimum_modulus = 673;          /* 151843 The polynomial modulus. Has to be greater than the polynomial
+    BigUnsigned minimum_modulus = 151843;       /*673 The polynomial modulus. Has to be greater than the polynomial
                                                 length and greater than each polynomial vector value. The value 
                                                 is possibly increased in ntt.new_modulus() to become prime. The
                                                 modulus 12289 (13.6 bits) is commonly used in lattice-based 
@@ -205,7 +205,7 @@ int main()
                                                 */
     
 
-    int n_moduli = 3;                        /* 6 Number of RNS channels. Increasing this number increases parallelism and reduces an N by N-bit
+    int n_moduli = 4;                        /* 3// Number of RNS channels. Increasing this number increases parallelism and reduces an N by N-bit
                                              multiplication (N = n_bits) into k smaller N/k x N/k multiplications (k = n_moduli). This is only true
                                              if each channel takes on an equal number of bits as in determineRNSmoduli2(dR_bits, n_moduli). The other
                                              moduli generating function determineRNSmoduli(dR_bits, n_moduli) looks for powers of 2 and will resultingly have
@@ -231,9 +231,10 @@ int main()
 
     //Calculates rns moduli, extended base, and m_r
     vector<BigUnsigned> rns_moduli, bases;
-    bases =  RNS::determineRNSmoduli2(dR_bits, n_moduli, true);
-    //{3,7,13,17,29,73,5,11,19,23,31,37,8};//
-
+    bases = {4294967291,4294967279,4294967231,4294967197,4294967189,4294967161,4294967143,4294967111, 4294967087}; //32 bit primes
+    
+    //bases = RNS::determineRNSmoduli2(dR_bits, n_moduli, true);
+     
     printVector(bases, "All bases: ", true);
     for (int i = 0; i < n_moduli; i++) {
         rns_moduli.push_back(bases[i]);
@@ -244,11 +245,16 @@ int main()
     cout << "Initializing montgomery reduction" << endl;
     rns.initializeREDCParameters(n_moduli, minimum_modulus, bases);
     cout << "Complete" << endl;
+    //rns.savetotextREDCParameters();
     
+    //printVector(rns.weights, "new: ");
+    //printVector(rns.weights_extendedbase, "new2: ");
+    //printVector(rns.getSingleResidues(bases), "correct: ");
 
-   rns.shenoyTest(100);
+   //rns.converterTest(10);
+   //rns.shenoyTest(100);
    //rns.bajardTest(10);
-   //rns.baseExtensionTest(100);
+   rns.baseExtensionTest(1000);
    //rns.RNSmodmultTest(100);
     return 0;
 
