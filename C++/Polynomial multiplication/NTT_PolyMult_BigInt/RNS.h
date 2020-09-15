@@ -38,18 +38,19 @@ NOTE: int is now replaced with BigUnsigned
 class RNS
 {
     private:
-        // Functions
-        BigUnsigned getDynamicRange();
 
-        std::vector<BigUnsigned> getSingleResidues(std::vector<BigUnsigned> mod);
 
 
     public:
+
+        // Functions
+        BigUnsigned getDynamicRange();
+        //std::vector<BigUnsigned> getSingleResidues(std::vector<BigUnsigned> mod);
+
         // Variables
         std::vector<BigUnsigned> moduli;    //base of coprimes
         std::vector<BigUnsigned> weights;   //int values of 1|0|0, 0|1|0, etc.
         std::vector<REDC> redc;             //montgomery reduction function for each moduli
-        BigUnsigned dR;                     //dynamic range 
         int n_moduli;                       //number of coprimes 
 
         //Functions
@@ -57,6 +58,7 @@ class RNS
 
         std::vector<BigUnsigned> forwardConverter(BigUnsigned num);
         BigUnsigned reverseConverter(std::vector<BigUnsigned> num_RNS);
+        void converterTest(int n_tests);
 
 
         std::vector<BigUnsigned> add_RNS(std::vector<BigUnsigned> A, std::vector<BigUnsigned> B);
@@ -93,6 +95,7 @@ class RNS
         //montgomery reduction functions 
          //sets up parameters for rns REDC
         std::vector<BigUnsigned> weights_extendedbase;   //int values of 1|0|0, 0|1|0, etc.
+        void savetotextREDCParameters();
         void initializeREDCParameters(int n_moduli, BigUnsigned modulus, std::vector<BigUnsigned> bases);
         std::vector<BigUnsigned> forwardConverter_extendedbase(BigUnsigned num);
         BigUnsigned reverseConverter_extendedbase(std::vector<BigUnsigned> num_RNS);
