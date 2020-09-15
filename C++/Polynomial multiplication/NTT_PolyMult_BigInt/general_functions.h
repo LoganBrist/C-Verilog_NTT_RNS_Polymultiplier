@@ -28,6 +28,10 @@ BigUnsigned sqrt_mod(BigUnsigned A, BigUnsigned mod);
 
 void printVector(std::vector<BigUnsigned> list, std::string name = "", bool printFullVector = false);
 
+void saveValToTextfile(BigUnsigned val, std::string savename = "");
+void saveVectorToTextfile(std::vector<BigUnsigned> vec, std::string savename = "",bool writeOnOneLine = false, int val_width = 5);
+void saveVectorVectorToTextfile(std::vector<std::vector<BigUnsigned>> vec, std::string savename = "");
+
 BigUnsigned gcd(BigUnsigned A, BigUnsigned B);
 
 bool isCoprimeToVector(BigUnsigned A, std::vector<BigUnsigned> B);
