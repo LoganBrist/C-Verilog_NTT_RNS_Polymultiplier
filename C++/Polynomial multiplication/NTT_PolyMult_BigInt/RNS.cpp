@@ -17,34 +17,40 @@ BigUnsigned RNS::getDynamicRange() {
 
 ///////////////////////////////////////////////////////////////////////////////
 // Returns values where the RNS sytem is 1|0|0, 0|1|0, 0|0|1, etc.
+
+// This is the same problem as following the general unconversion algorithm but for specific values of {1|0|0}, {0|1|0}, {0|0|1}...
 ///////////////////////////////////////////////////////////////////////////////
+/*
 vector<BigUnsigned> RNS::getSingleResidues(vector<BigUnsigned> mod) {
     vector<BigUnsigned> vals;
     BigUnsigned dr = product(mod);
     BigUnsigned dR_bitLength = dr.bitLength();
 
     for (int i = 0; i < mod.size(); i++) {
+
         BigUnsigned interval = BigUnsigned(dr / mod[i]);  // search in increments of dR/mod. It's the product of all the other moduli (so their residue is 0) 
     
         for (BigUnsigned num = interval; num <= dr; num += interval) {
             cout << "getSingleResidues() currently searching bits " << num.bitLength() << " out of " << dR_bitLength << " for channel " << i << ".\r";
             if (num % mod[i] == 1) {                                   //needs to be made more efficient for large dR. Is efficient for num up to 280 bits.
                 vals.push_back(num);
+                cout << num << endl;
                 break;
             }
         }
+        
     }
     cout << "                                                                                           " << endl;
     return vals;
 }
-
+*/
 ///////////////////////////////////////////////////////////////////////////////
 // Converts integer to RNS representation
 ///////////////////////////////////////////////////////////////////////////////
 vector<BigUnsigned> RNS::forwardConverter(BigUnsigned num) {
     vector<BigUnsigned> num_RNS;
-    for (int i = 0; i < n_moduli; i++) {
-        num_RNS.push_back(num % moduli[i]);
+    for (int i = 0; i < n_base1; i++) { //n_moduli
+        num_RNS.push_back(num % base1[i]);
     }
     return num_RNS;
 }
@@ -54,15 +60,39 @@ vector<BigUnsigned> RNS::forwardConverter(BigUnsigned num) {
 ///////////////////////////////////////////////////////////////////////////////
 BigUnsigned RNS::reverseConverter(vector<BigUnsigned> num_RNS) {
     BigUnsigned ret_val         = 0;
-    for (int i = 0; i < n_moduli; i++) {
+    for (int i = 0; i < n_base1; i++) {  
         ret_val += weights[i] * num_RNS[i];
-        ret_val %= dR;   
+        ret_val %= D1;  
     }
 
     return BigUnsigned(ret_val);
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Convert BigUnsigned to RNS (of extended and m_r)
+///////////////////////////////////////////////////////////////////////////////
+vector<BigUnsigned> RNS::forwardConverter_extendedbase(BigUnsigned num) {
+    vector<BigUnsigned> num_RNS;
 
+    for (int i = 0; i < n_base2; i++) {
+        num_RNS.push_back(num % base2[i]);
+    }
+
+    return num_RNS;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Converts RNS to BigUnsigned representation for extended base
+///////////////////////////////////////////////////////////////////////////////
+BigUnsigned RNS::reverseConverter_extendedbase(vector<BigUnsigned> num_RNS) {
+    BigUnsigned ret_val = 0;
+    for (int i = 0; i < n_base2; i++) {
+        ret_val += weights_extendedbase[i] * num_RNS[i];
+        ret_val %= (D2 * m_r);    // the extension dynamic range is calculated excluding the redundant base, but the forward converter uses it so it needs included. 
+    }
+
+    return BigUnsigned(ret_val);
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 // RNS montgomery reduction parameters
@@ -141,42 +171,6 @@ void RNS::initializeREDCParameters(int n_moduli, BigUnsigned modulus, vector<Big
     n_base2     = n_moduli + 1;  //holds redundant moduli
     total_bases = n_base1 + n_base2;  
     
-    //set size of bases to allow index assignment (someone said this may be bad)
-    /*
-    base1.reserve(n_moduli);
-    base2.reserve(2 * n_moduli);
-
-    //zero pad as to allow indexing
-    for (int a = 0; a < n_base1; a++) {
-        base1.push_back(1);
-    }
-    for (int a = 0; a < n_base2; a++) {
-        base2.push_back(1);
-    }
-
-    
-    for (int a = 0; a < total_bases; a++) {
-        M_inv_red_i.push_back(1);
-        M_red_j.push_back(1);
-
-        vector<BigUnsigned> C, D;
-        for (int b = 0; b < total_bases; b++) {
-            C.push_back(1);
-            D.push_back(1);
-        }
-        D1_i_red_j.push_back(C);
-        D2_j_red_i.push_back(D);
-
-        D1_i.push_back(1);
-        D2_j.push_back(1);
-        D1_i_inv_red_i.push_back(1);
-        D2_j_inv_red_j.push_back(1);
-        D2_j_red_r.push_back(1);
-        D2_red_i.push_back(1);
-        D1_inv_red_j.push_back(1);
-    }
-    */
-
     //save list of all bases 
     bases = all_bases;
 
@@ -190,9 +184,6 @@ void RNS::initializeREDCParameters(int n_moduli, BigUnsigned modulus, vector<Big
         base2.push_back(bases[j]);
     }
 
-    // Base 2 conversion weights
-    weights_extendedbase = getSingleResidues(base2);   //int values of 1|0|0, 0|1|0, etc.
-
     // Redundant moduli (BigUnsigned)
     m_r = bases[total_bases-1];
 
@@ -200,15 +191,17 @@ void RNS::initializeREDCParameters(int n_moduli, BigUnsigned modulus, vector<Big
 
     // Reduction modulus (BigUnsigned)
     M     = modulus; 
-    M_inv = modinv(M, dR);   //may not be right
 
     // Dynamic range of base1- also montgomery number  (BigUnsigned)
-    D1 = dR;
+    D1 = product(base1);
     D1_inv = modinv(D1, modulus); //inverse with respect to the reduction modulus 
 
     // Dynamic range of base2  excluding m_r (BigUnsigned)
     D2 = product(base2) / m_r;
-  
+
+    //Modulus inverse with respect to dynamic range
+    M_inv = modinv(M, D1);   //may not be right
+
     //check if input conditions are correct (k = n channels, M = reduction modulus, D =  dynamic range 1, D' = dynamic range 2)
     int k = n_moduli;
 
@@ -296,8 +289,99 @@ void RNS::initializeREDCParameters(int n_moduli, BigUnsigned modulus, vector<Big
     // 12: Inverse of D2 and the r modulus, reduced by the r modulus (BigUnsigned)
     D2_inv_red_r = modinv(D2, m_r); 
 
+    // Base 1 conversion weights
+    for (int i = 0; i < n_base1; i++) {
+        weights.push_back((D1_i[i] * D1_i_inv_red_i[i]) % D1);     //int values of 1|0|0, 0|1|0, etc.
+    }
+
+    // Base 2 conversion weights
+    for (int j = 0; j < n_base2; j++) {
+        BigUnsigned a = (D2 * m_r) / base2[j];
+        BigUnsigned b = modinv(a, base2[j]);
+        weights_extendedbase.push_back((a * b) % (D2 * m_r)); 
+
+        /*IMPORTANT: This needs to be written this way, instead of being a copy of the base 1 weight code. The values here that depend on D2 are recalculated to include
+        m_r in the dynamic range (because all other code besides the forward/reverse converter do not include m_r as one of the bases). */
+    }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// prints REDC parameters into text files
+
+///////////////////////////////////////////////////////////////////////////////
+void RNS::savetotextREDCParameters() {
+
+    // Original RNS moduli (vector BigUnsigned)
+    saveVectorToTextfile(base1,"Parameters/base1.txt");
+
+    // Extended base + redundant modulus (vector BigUnsigned)
+    saveVectorToTextfile(base2,"Parameters/base2.txt");
+
+    // Base 2 conversion weights
+    saveVectorToTextfile(weights_extendedbase, "Parameters/weights_extendedbase.txt");
+
+    // Redundant moduli (BigUnsigned)
+    saveValToTextfile(m_r, "Parameters/m_r.txt");
+
+    // Reduction modulus (BigUnsigned)
+    saveValToTextfile(M, "Parameters/M.txt");
+    saveValToTextfile(M_inv, "Parameters/M_inv.txt");
+
+    // Dynamic range of base1 and base2 (BigUnsigned)
+    saveValToTextfile(D1, "Parameters/D1.txt");
+    saveValToTextfile(D1_inv, "Parameters/D1_inv.txt");
+    saveValToTextfile(D2, "Parameters/D2.txt");
+
+
+
+
+    // D1 divided by the ith modulus (vector BigUnsigned)
+    saveVectorToTextfile(D1_i, "Parameters/D1_i.txt");
+    
+
+    // D2 divided by the jth modulus (vector BigUnsigned)
+    saveVectorToTextfile(D2_j, "Parameters/D2_j.txt");
+    
+
+    /*----- Montgomery Reduction parameters  ------*/
+
+        // 1: Inverse of D1 and m_r, reduced by m_r (BigUnsigned) 
+    saveValToTextfile(D1_inv_red_r, "Parameters/D1_inv_red_r.txt");
+
+    // 2: Inverse of 2 and m_r, reduced by m_r (BigUnsigned) 
+    saveValToTextfile(two_inv_red_r, "Parameters/two_inv_red_r.txt");
+
+    // 3: Inverse of M and the ith modulus, reduced by the ith modulus (vector BigUnsigned) 
+    saveVectorToTextfile(M_inv_red_i, "Parameters/M_inv_red_i.txt");
+    
+    // 4: M reduced by the jth modulus (vector BigUnsigned) 
+    saveVectorToTextfile(M_red_j, "Parameters/M_red_j.txt");
+    
+    // 5: Inverse of D1_i and the ith modulus, reduced by the ith modulus (vector BigUnsigned) 
+    saveVectorToTextfile(D1_i_inv_red_i, "Parameters/D1_i_inv_red_i.txt");
+    
+    // 6: Each D1_i reduced by each jth modulus (vector vector BigUnsigned)
+    saveVectorVectorToTextfile(D1_i_red_j, "Parameters/D1_i_red_j.txt");
+    
+    // 7: Each D2_j reduced by each ith modulus (vector vector BigUnsigned)
+    saveVectorVectorToTextfile(D2_j_red_i, "Parameters/D2_j_red_i.txt");
+
+    // 8: inverse of D2_j and the jth modulus, reduced by each jth modulus (vector BigUnsigned)
+    saveVectorToTextfile(D2_j_inv_red_j, "Parameters/D2_j_inv_red_j.txt");
+
+    // 9: Each D2_j reduced by the r modulus (vector BigUnsigned)
+    saveVectorToTextfile(D2_j_red_r, "Parameters/D2_j_red_r.txt");
+
+    // 10: D2 reduced by each ith modulus (vector BigUnsigned)
+    saveVectorToTextfile(D2_red_i, "Parameters/D2_red_i.txt");
+
+    // 11: Inverse of D1 and the jth modulus, reduced by the jth modulus (vector BigUnsigned)
+    saveVectorToTextfile(D1_inv_red_j, "Parameters/D1_inv_red_j.txt");
+
+    // 12: Inverse of D2 and the r modulus, reduced by the r modulus (BigUnsigned)
+    saveValToTextfile(D2_inv_red_r, "Parameters/D2_inv_red_r.txt");
+
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 // Base extension 1 (Bajard base extension)
@@ -539,36 +623,47 @@ vector<BigUnsigned> RNS::modmult_RNS(vector<BigUnsigned> A, vector<BigUnsigned> 
     return Z_i;
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// Convert BigUnsigned to RNS (of extended and m_r)
-///////////////////////////////////////////////////////////////////////////////
-vector<BigUnsigned> RNS::forwardConverter_extendedbase(BigUnsigned num) {
-    vector<BigUnsigned> num_RNS;
-    
-    for (int i = n_base1; i < total_bases; i++) {
-        num_RNS.push_back(num % bases[i]);
-    }
 
-    /*
-    for (int i = 0; i < total_bases; i++) {
-        num_RNS.push_back(num % bases[i]);
-    }
-    */
-    return num_RNS;
-}
 
 ///////////////////////////////////////////////////////////////////////////////
-// Converts RNS to BigUnsigned representation for extended base
+// Tests forward and reverse converter
 ///////////////////////////////////////////////////////////////////////////////
-BigUnsigned RNS::reverseConverter_extendedbase(vector<BigUnsigned> num_RNS) {
-    BigUnsigned ret_val = 0;
-    for (int i = 0; i < n_base2; i++) {
-        ret_val += weights_extendedbase[i] * num_RNS[i];
-        ret_val %= D2;
-    }
+void RNS::converterTest(int n_tests){
 
-    return BigUnsigned(ret_val);
-}
+    for (int i = 0; i < n_tests; i++) {
+        cout << "Converter test: " << endl << endl;
+
+        BigUnsigned num = rand() % D1.toUnsignedInt();
+
+        vector<BigUnsigned> rns1 = forwardConverter(num);
+        vector<BigUnsigned> rns2 = forwardConverter_extendedbase(num);
+
+        BigUnsigned res1 = reverseConverter(rns1);
+        BigUnsigned res2 = reverseConverter_extendedbase(rns2);
+
+        cout << "Integer: " << num << endl;
+        printVector(rns1, "Forward RNS - base 1: ");
+        printVector(rns2, "Forward RNS - base 2: ");
+
+        cout << "Reverse Integer - base 1: " << res1 << endl;
+        cout << "Reverse Integer - base 2: " << res2 << endl;
+
+        if ((res1 == num) && (res2 == num))
+            cout << "Correct." << endl;
+        else
+            cout << "Wrong." << endl;
+
+        /*for (int i = 0; i < n_base1; i++) {
+            BigUnsigned ans = num % base1[i];
+            BigUnsigned res = rns1[i];
+            if (ans != res) {
+                cout << num << " % " << base1[i] << " should = " << ans << ", not " << res << "." << endl;
+            }
+        }
+        cout << "Integer: " << num << endl;
+        */
+    }
+ }
 
 ///////////////////////////////////////////////////////////////////////////////
 // RNS mod mult test
@@ -921,7 +1016,7 @@ vector<BigUnsigned> RNS::determineRNSmoduli2(int totalBits, int n_moduli, bool g
 /////////////////////////////////////////////////////////////////////////////
 void RNS::RNS_test(RNS rns, bool mult) {
     BigUnsigned val, ans;
-    BigUnsigned lim = rns.dR;
+    BigUnsigned lim = rns.D1;
 
     for (BigUnsigned i = 0; i < lim; i++) {
         for (BigUnsigned j = 0; j < i; j++) {
@@ -931,7 +1026,7 @@ void RNS::RNS_test(RNS rns, bool mult) {
                 ans = i * j;
                 if (val != ans) {
                     cout << i << " * " << j << " = " << val << " != " << ans << endl;
-                    cout << "All values multiplying to " << ans - 1 << " with a dynamic range of " << rns.dR << " calculated correctly." << endl;
+                    cout << "All values multiplying to " << ans - 1 << " with a dynamic range of " << rns.D1 << " calculated correctly." << endl;
                     return;
                 }
             }
@@ -941,14 +1036,14 @@ void RNS::RNS_test(RNS rns, bool mult) {
                 ans = i + j;
                 if (val != ans) {
                     cout << i << " + " << j << " = " << val << " != " << ans << endl;
-                    cout << "All values summing to " << ans - 1 << " with a dynamic range of " << rns.dR << " calculated correctly." << endl;
+                    cout << "All values summing to " << ans - 1 << " with a dynamic range of " << rns.D1 << " calculated correctly." << endl;
                     return;
                 }
             }
         }
     }
 
-    cout << "All values up to " << lim << " with a dynamic range of " << rns.dR << " calculated correctly." << endl;
+    cout << "All values up to " << lim << " with a dynamic range of " << rns.D1 << " calculated correctly." << endl;
 }
 
 
@@ -960,8 +1055,6 @@ RNS::RNS(vector<BigUnsigned> mod) {
     
     moduli   = mod;
     n_moduli = mod.size();
-    dR = getDynamicRange(); 
-    weights = getSingleResidues(moduli);
 
     // create montgomery reduction module for each moduli
     for (int i = 0; i < mod.size(); i++) {
