@@ -22,9 +22,10 @@ class NTT
 		
 		static BigUnsigned new_modulus(BigUnsigned vec_length, BigUnsigned min_modulus);
 		std::vector<BigUnsigned> calculate(std::vector<BigUnsigned> A, bool inverse = false);
+		std::vector<std::vector<BigUnsigned>> calculate_rns(std::vector<std::vector<BigUnsigned>> A, bool inverse = false);
 		std::vector<BigUnsigned> stupidcalculate(std::vector<BigUnsigned> A, bool inverse = false);
 		static BigUnsigned find_root_of_unity2(BigUnsigned vec_length, BigUnsigned modulus);
-		void NTT_test(std::vector<BigUnsigned> A);
+		void NTT_test(int n_tests);
 		std::vector<BigUnsigned> static solveParameters(BigUnsigned vector_length, BigUnsigned mod, bool modulusIsPrimeIPromse = false);
 		void printParameters();
 
