@@ -44,35 +44,37 @@ class RNS
     public:
 
         // Functions
-        BigUnsigned getDynamicRange();
-        //std::vector<BigUnsigned> getSingleResidues(std::vector<BigUnsigned> mod);
 
         // Variables
-        std::vector<BigUnsigned> moduli;    //base of coprimes
-        std::vector<BigUnsigned> weights;   //int values of 1|0|0, 0|1|0, etc.
+        int                                      n_base1, n_base2, n_base2_no_mr, total_bases;   //number in each RNS base
+        std::vector<BigUnsigned>                   base1,   base2,   base2_no_mr,       bases;   //Bases of coprimes
+   
+        std::vector<BigUnsigned> weights_base1, weights_base2, weights_base2_no_mr, weights_bases;   //int values of 1|0|0, 0|1|0, etc.
         std::vector<REDC> redc;             //montgomery reduction function for each moduli
-        int n_moduli;                       //number of coprimes 
+
+        //Initialization
+        RNS();  
+        void initializeParameters(std::vector<BigUnsigned> moduli, BigUnsigned montgomery_reduction_modulus);
+        void savetotextParameters();
 
         //Functions
-        RNS(std::vector<BigUnsigned> mod = {3,5,7,11});  //constructor
+        BigUnsigned getDynamicRange(std::vector<BigUnsigned> base);
+        std::vector<BigUnsigned> forwardConverter(BigUnsigned num, std::vector<BigUnsigned> base);
+        BigUnsigned reverseConverter(std::vector<BigUnsigned> num_RNS, std::vector<BigUnsigned> base);
+        std::vector<BigUnsigned> getConversionWeights(std::vector<BigUnsigned> base);
+        std::vector<std::vector<BigUnsigned>> RNS::forwardConverter_polynomial(std::vector<BigUnsigned> polynomial, std::vector<BigUnsigned> base);
+        std::vector<BigUnsigned> RNS::reverseConverter_polynomial(std::vector<std::vector<BigUnsigned>> polynomial_rns, std::vector<BigUnsigned> base);
 
-        std::vector<BigUnsigned> forwardConverter(BigUnsigned num);
-        BigUnsigned reverseConverter(std::vector<BigUnsigned> num_RNS);
-        void converterTest(int n_tests);
+        std::vector<BigUnsigned> add_RNS(std::vector<BigUnsigned> A, std::vector<BigUnsigned> B, std::vector<BigUnsigned> base);
+        std::vector<BigUnsigned> sub_RNS(std::vector<BigUnsigned> A, std::vector<BigUnsigned> B, std::vector<BigUnsigned> base);
+        std::vector<BigUnsigned> mult_RNS(std::vector<BigUnsigned> A, std::vector<BigUnsigned> B, std::vector<BigUnsigned> base);
 
 
-        std::vector<BigUnsigned> add_RNS(std::vector<BigUnsigned> A, std::vector<BigUnsigned> B);
-        std::vector<BigUnsigned> sub_RNS(std::vector<BigUnsigned> A, std::vector<BigUnsigned> B);
-        std::vector<BigUnsigned> mult_RNS(std::vector<BigUnsigned> A, std::vector<BigUnsigned> B);
-
-
-        BigUnsigned add(BigUnsigned A, BigUnsigned B);
-        BigUnsigned sub(BigUnsigned A, BigUnsigned B);
-        BigUnsigned mult(BigUnsigned A, BigUnsigned B);
+        BigUnsigned add(BigUnsigned A, BigUnsigned B, std::vector<BigUnsigned> base);
+        BigUnsigned sub(BigUnsigned A, BigUnsigned B, std::vector<BigUnsigned> base);
+        BigUnsigned mult(BigUnsigned A, BigUnsigned B, std::vector<BigUnsigned> base);
 
         //montgomery reduction variables
-        int                                   n_base1, n_base2, total_bases;
-        std::vector<BigUnsigned>                   base1, base2, bases;
         BigUnsigned                           M,M_inv,D1, D1_inv, D2, m_r;
         std::vector<BigUnsigned>                   D1_i, D2_j;
 
@@ -95,20 +97,20 @@ class RNS
         //montgomery reduction functions 
          //sets up parameters for rns REDC
         std::vector<BigUnsigned> weights_extendedbase;   //int values of 1|0|0, 0|1|0, etc.
-        void savetotextREDCParameters();
-        void initializeREDCParameters(int n_moduli, BigUnsigned modulus, std::vector<BigUnsigned> bases);
-        std::vector<BigUnsigned> forwardConverter_extendedbase(BigUnsigned num);
-        BigUnsigned reverseConverter_extendedbase(std::vector<BigUnsigned> num_RNS);
+
+
+
         std::vector<BigUnsigned> baseExtension1(std::vector<BigUnsigned> num_RNS, std::vector<BigUnsigned> base, std::vector<BigUnsigned> newbase);
         std::vector<BigUnsigned> baseExtension2(std::vector<BigUnsigned> num_RNS, std::vector<BigUnsigned> base, std::vector<BigUnsigned> newbase);
         
-        std::vector<BigUnsigned> modmult_RNS_bajard(std::vector<BigUnsigned> A, std::vector<BigUnsigned> B);
-        std::vector<BigUnsigned> modmult_RNS_split(std::vector<BigUnsigned> A, std::vector<BigUnsigned> B);
         std::vector<BigUnsigned> modmult_RNS(std::vector<BigUnsigned> A, std::vector<BigUnsigned> B);
+
+
         bool RNSmodmultTest(int n_tests);
         bool baseExtensionTest(int n_tests);
         bool shenoyTest(int n_tests);
         bool bajardTest(int n_tests);
+        void converterTest(int n_tests);
 
         // Non-object dependent functions
         static std::vector<BigUnsigned> determineRNSmoduli(int totalBits, int n_moduli);
