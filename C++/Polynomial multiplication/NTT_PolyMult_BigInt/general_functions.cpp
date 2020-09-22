@@ -20,10 +20,34 @@ BigUnsigned product(vector<BigUnsigned> vec) {
 }
 
 //////////////////////////////////////////////////////////////////////////////
+// Returns random bigUnsigned of arbitrary size
+///////////////////////////////////////////////////////////////////////////////
+BigUnsigned getRandomBigUnsigned(BigUnsigned range) {
+    int BW = range.bitLength();
+    int n_32bits = BW / 32;
+
+    BigUnsigned random;
+
+    if (BW < 32)
+        random = rand() % range.toInt();
+
+    else {
+        random = rand() % (4294967294 / 2); //unsigned 31 bit value
+        for (int i = 0; i < n_32bits; i++) {
+            random *= random;
+        }
+    }
+    return random;
+}
+
+//////////////////////////////////////////////////////////////////////////////
 // Compare vectors
 // Returns true if vectors are equal
 ///////////////////////////////////////////////////////////////////////////////
 bool vectorsAreEqual(vector<BigUnsigned> a, vector<BigUnsigned> b) {
+    if (a.size() != b.size())
+        return false;
+
     for (int i = 0; i < a.size(); i++) {
         if (a[i] != b[i])
             return false;
@@ -64,22 +88,47 @@ vector<BigUnsigned> rns_hadamard_product(vector<BigUnsigned> a, vector<BigUnsign
 // Returns uniformly random polynomial of length N in ring q
 ///////////////////////////////////////////////////////////////////////////////
 // rand % q needs fixed
-vector<BigUnsigned> sample_polynomial(BigUnsigned N, BigUnsigned q) {
+vector<BigUnsigned> sample_polynomial(BigUnsigned length, BigUnsigned range) {
     vector<BigUnsigned> Z;
 
     // use modulus q only if <= 32 bits
     unsigned long mod;
-    if (q.bitLength() <= 32) {
-        mod = q.toUnsignedLong();
+    if (range.bitLength() <= 32) {
+        mod = range.toUnsignedLong();
     }
     else
         mod = unsigned int(pow(2, 31));
 
     //sample
-    for (BigUnsigned i = 0; i < N; i++) {
+    for (BigUnsigned i = 0; i < length; i++) {
         Z.push_back(rand() % mod);
     }
     return Z;
+}
+
+
+////////////////
+vector<BigUnsigned> get_random_RNS_val(vector<BigUnsigned> moduli, BigUnsigned range) {
+    //random integer
+    BigUnsigned A = rand() % range.toUnsignedInt();
+
+    //convert to RNS
+    vector<BigUnsigned> A_rns;
+    for (int i = 0; i < moduli.size(); i++) {
+        A_rns.push_back(A % moduli[i]);
+    }
+
+    return A_rns;
+}
+
+vector<vector<BigUnsigned>> sample_RNS_polynomial(int length, vector<BigUnsigned> moduli, BigUnsigned range) {
+    vector<vector<BigUnsigned>> A;
+
+    for (int i = 0; i < length; i++) {
+        A.push_back(get_random_RNS_val(moduli, range));
+    }
+
+    return A;
 }
 
 ///////////////////////////////////////////////////////////////
@@ -104,6 +153,24 @@ vector<BigUnsigned> bitReverse(vector<BigUnsigned> A) {
     return Z;
 }
 
+// for vector vector types
+vector<vector<BigUnsigned>> bitReverse_rns(vector<vector<BigUnsigned>> A) {
+    vector<vector<BigUnsigned>> Z = A; //return vector
+    int N = Z.size();
+    int n_bits = ceil(log2(N));
+
+    for (int i = 0; i < N; i++) {
+        int val = 0;
+        int idx = 0;
+        for (int j = 0; j < n_bits; j++) {
+            val = i & (1 << j); //A[i] --> i
+            if (val)
+                idx |= 1 << ((n_bits - 1) - j);
+        }
+        Z[i] = A[idx];
+    }
+    return Z;
+}
 ///////////////////////////////////////////////////////////////
 // Factorize & isPrime
 // Returns a vector of prime factors of integer 
