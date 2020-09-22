@@ -119,8 +119,9 @@ bool NTT::is_generator(BigUnsigned val, BigUnsigned totient, BigUnsigned mod) {
 
 BigUnsigned NTT::find_generator(BigUnsigned totient, BigUnsigned mod) {
     for (BigUnsigned i = 1; i < mod; i++) {
-        if (is_generator(i, totient, mod))
+        if (is_generator(i, totient, mod)) {
             return i;
+        }
     }
 }
 ///////////////////////////////////////////////////////////////
@@ -139,9 +140,9 @@ BigUnsigned NTT::find_generator(BigUnsigned totient, BigUnsigned mod) {
 vector<BigUnsigned> NTT::solveParameters(BigUnsigned vector_length, BigUnsigned minimum_modulus, bool modulusIsPrimeIPromise) {
     BigUnsigned modulus_local = minimum_modulus;
     if (modulusIsPrimeIPromise == false)
-        modulus_local = NTT::new_modulus(vector_length, minimum_modulus);     // Used modulus
+        modulus_local = NTT::new_modulus(vector_length, minimum_modulus);             // Used modulus
     BigUnsigned w_n_local = find_root_of_unity2(vector_length, modulus_local);        // nth root of unity
-    BigUnsigned w_n_inv_local = mod_inverse(w_n_local, modulus_local);                         // root inverse
+    BigUnsigned w_n_inv_local = mod_inverse(w_n_local, modulus_local);                // root inverse
     BigUnsigned phi_local = sqrt_mod(w_n_local, modulus_local);
     BigUnsigned phi_inv_local = mod_inverse(phi_local, modulus_local);
 
@@ -187,16 +188,9 @@ void NTT::butterfly(BigUnsigned* left_val, BigUnsigned* right_val) {
 }
 
 
-
-
-
-
 ///////////////////////////////////////////////////////////////////////////////
 // NTT 
-// Based on Nayuki radix2, with RNS 
-
-// The function rns.mult(a,b) uses the chosen RNS to multiply. That RNS
-// uses montgomery reduction internally as long as the rns modulus is odd.
+// Based on Nayuki radix2 
 ///////////////////////////////////////////////////////////////////////////////
 vector<BigUnsigned> NTT::calculate(vector<BigUnsigned> A, bool inverse) {
     int n = A.size();
@@ -211,7 +205,7 @@ vector<BigUnsigned> NTT::calculate(vector<BigUnsigned> A, bool inverse) {
 
     for (int i = 0; i < n / 2; i++) {
         powtable.push_back(temp);
-        temp = rns.mult(temp, omeg) % modulus; //temp * omeg % modulus;
+        temp = temp * omeg % modulus;
     }
 
     printVector(powtable);
@@ -231,9 +225,9 @@ vector<BigUnsigned> NTT::calculate(vector<BigUnsigned> A, bool inverse) {
                 BigUnsigned left = A[start];
                 cout << "addr1: " << start << " addr2: " << end << endl;
                 cout << "in1: " << A[start] << "   in2: " << A[end] << "      " << "  phi: " << powtable[k] << endl;
-                BigUnsigned right = rns.mult(A[end], powtable[k]) % modulus; //(A[l] * powtable[k]) % modulus;
+                BigUnsigned right = (A[end] * powtable[k]) % modulus; 
                 A[start] = (left + right) % modulus;
-                A[end] = (left + modulus - right) % modulus;
+                A[end]   = (left + modulus - right) % modulus;
                 cout << "out1: " << A[start] << "   out2: " << A[end] << endl << endl;
                 k += tablestep;
             }
@@ -245,76 +239,115 @@ vector<BigUnsigned> NTT::calculate(vector<BigUnsigned> A, bool inverse) {
     }
     
 
-    //renamed NTT (not working)
-    /*
-    int vec_length = A.size();
-    for (int block_height = 2; block_height < vec_length; block_height *= 2) {
-        int n_blocks = n / block_height;
-        int half_size = block_height / 2;
-        for (int block = 0; block < n_blocks; block++) {
-            int table_index = 0;
-            int block_start = block * block_height;
-            int block_end   = block * block_height + block_height;
-            for (int start = block_start; start < block_end / 2; start++) {
-                int end = start + half_size;
-                BigUnsigned left = A[start];
-                BigUnsigned right = rns.mult(A[end], powtable[table_index]) % modulus; //(A[l] * powtable[k]) % modulus;
-                A[start] = (left + right) % modulus;
-                A[end] = (left + modulus - right) % modulus;
-                table_index += n_blocks;
-
-               // butterfly(&left,&right);
-            }
-        }
-    }
-    */
     cout << "100% of butterfly NTT done." << endl;
     if (inverse)
         A = hadamard_product(A, constant_vector(n, mod_inverse(n, modulus)), modulus);
     return A;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// NTT 
+// Based on Nayuki radix2, with RNS 
+
+// The function rns.mult(a,b) uses the chosen RNS to multiply. That RNS
+// uses montgomery reduction internally as long as the rns modulus is odd.
+///////////////////////////////////////////////////////////////////////////////
+vector<vector<BigUnsigned>> NTT::calculate_rns(vector<vector<BigUnsigned>> A, bool inverse) {
+    int n      = A.size();
+    int levels = log2(n);
+
+    vector<vector<BigUnsigned>> powtable;
+
+    vector<BigUnsigned> temp = rns.forwardConverter(1, rns.bases);
+    vector<BigUnsigned> omeg = rns.forwardConverter(w_n, rns.bases);
+    
+    if (inverse)
+        omeg = rns.forwardConverter(w_n_inv, rns.bases);
+
+    for (int i = 0; i < n / 2; i++) {
+        powtable.push_back(temp);
+        temp = rns.modmult_RNS(temp, omeg);
+    }
+
+    A = bitReverse_rns(A);
+
+    int size  = 2;
+    int count = 0;
+
+    while (size <= n) {
+        int halfsize = size / 2;
+        int tablestep = n / size;
+
+        for (int i = 0; i < n; i += size) {
+            int  k = 0;
+            for (int start = i; start < i + halfsize; start++) {
+                int end = start + halfsize;
+                vector<BigUnsigned> left = A[start];
+                vector<BigUnsigned> right = rns.modmult_RNS(A[end], powtable[k]);
+                A[start] = rns.add_RNS(left,right, rns.bases);
+                A[end]   = rns.sub_RNS(left,right, rns.bases);
+                k += tablestep;
+            }
+            count++;
+            cout << count*100/n << "% of RNS butterfly NTT done.\r";
+        }
+
+        size += size;  // size = size * 2
+    }
+
+
+    cout << "100% of butterfly NTT done." << endl;
+    //if (inverse)
+        //A = hadamard_product(A, constant_vector(n, mod_inverse(n, modulus)), modulus); //needs to make rns functions
+    return A;
+}
 
 /////////////////////////////////////////////////////////////////////////////
 // Tests forw/inv for reference NTT and custom NTT on vector A
 /////////////////////////////////////////////////////////////////////////////
-void NTT::NTT_test(vector<BigUnsigned> A) {
-    vector<BigUnsigned> Z;
+void NTT::NTT_test(int n_tests) {
+    int n_correct = 0;
+    cout << endl << endl << "NTT TEST:" << endl << endl;
+    for (int i = 0; i < n_tests; i++) {
+        //variables
+        vector<BigUnsigned> A, Z, ans;
+        vector<vector<BigUnsigned>> A_rns, Z_rns;
 
-    cout << endl << endl << "NTT TESTS:" << endl;
-    printVector(A, "input:");
-    cout << endl;
+        //generate random polynomial
+        A     = sample_polynomial(vec_length, modulus);
+        A_rns = rns.forwardConverter_polynomial(A, rns.bases);
 
-    //reference NTT
-    Z = stupidcalculate(A);
-    printVector(Z, "Stupid NTT:");
-    Z = stupidcalculate(Z, true);
-    printVector(Z, "result:");
-    cout << endl;
+        printVector(A, "Test polynomial:");
+        cout << endl;
 
-    // efficient NTT 5
-    Z = calculate(A);
-    printVector(Z, "Nayuki NTT with RNS:");
-    Z = calculate(Z, true);
-    printVector(Z, "result:");
-    cout << endl;
-}
-///////////////////////////////////////////////////////////////////////////////
-// Constructor
-///////////////////////////////////////////////////////////////////////////////
-NTT::NTT(BigUnsigned vector_length, BigUnsigned minimum_modulus, RNS rns_system, bool modulusIsPrimeIPromise) {
-    vec_length = vector_length;
-    min_mod = minimum_modulus;
-    rns = rns_system;
+        //reference NTT
+        ans = stupidcalculate(A);
+        printVector(ans, "Correct NTT: ");
 
-    vector<BigUnsigned> params = solveParameters(vector_length, minimum_modulus, modulusIsPrimeIPromise);
-    modulus = params[0];
-    w_n     = params[1];
-    w_n_inv = params[2];
-    phi     = params[3];
-    phi_inv = params[4];
+        // efficient NTT
+        Z_rns = calculate_rns(A_rns);
+        Z = rns.reverseConverter_polynomial(Z_rns, rns.bases);
+        printVector(Z, "Test NTT: ");
+        cout << endl;
+       
+        //Z = stupidcalculate(Z, true);
+        //printVector(Z, "result:");
+        //Z = calculate(Z, true);
+        //printVector(Z, "result:");
+        //cout << endl;
 
-    phi_table  = generate_phi_table(vector_length, phi, modulus);    // bit reversed powers of phi
+        if (vectorsAreEqual(ans, Z)) {
+            cout << "Correct." << endl << endl;
+            n_correct++;
+        }
+
+        else {
+            cout << "Incorrect." << endl << endl;
+        }
+        
+    }
+
+    cout << n_correct << "/" << n_tests << " tests correct." << endl << endl;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -336,6 +369,23 @@ void save_twiddle_table(char* savename, BigUnsigned NTT_size, BigUnsigned w_n, B
     Twiddlefile.close();
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Constructor
+///////////////////////////////////////////////////////////////////////////////
+NTT::NTT(BigUnsigned vector_length, BigUnsigned minimum_modulus, RNS rns_system, bool modulusIsPrimeIPromise) {
+    vec_length = vector_length;
+    min_mod    = minimum_modulus;
+    rns        = rns_system;
+
+    vector<BigUnsigned> params = solveParameters(vector_length, minimum_modulus, modulusIsPrimeIPromise);
+    modulus = params[0];
+    w_n     = params[1];
+    w_n_inv = params[2];
+    phi     = params[3];
+    phi_inv = params[4];
+
+    phi_table = generate_phi_table(vector_length, phi, modulus);    // bit reversed powers of phi
+}
 
 /*
 //creates long text files with n polynomials A,B, and mult result C for FPGA testing 
