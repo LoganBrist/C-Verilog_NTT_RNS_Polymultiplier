@@ -24,10 +24,10 @@ module RNS_sub_tb(
 
     );
       // RNS module parameters   
-      parameter integer CH_BW        = 4;                                                                    //RNS channel bitwidth
+      parameter integer CH_BW        = 32;                                                                    //RNS channel bitwidth
       parameter integer N_CHANNELS   = 4;                                                                     //Number of RNS channels, stay constant for test
       parameter RNS_BW               = CH_BW * N_CHANNELS;                                                    //total RNS buswidth
-      parameter RNS_MOD              = {4'd2, 4'd4, 4'd10, 4'd11};      //RNS channels
+      parameter RNS_MOD              = {32'd4294967291, 32'd4294967279, 32'd4294967231, 32'd4294967197};      //RNS channels
       
       // Test parameters
       parameter N_TESTS  = 2000;

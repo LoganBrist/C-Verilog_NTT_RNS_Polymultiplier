@@ -3,10 +3,10 @@ module RNS_mult_tb(
 
   
   // RNS module parameters   
-  parameter integer CH_BW        = 4;                                                                    //RNS channel bitwidth
+  parameter integer CH_BW        = 32;                                                                    //RNS channel bitwidth
   parameter integer N_CHANNELS   = 4;                                                                     //Number of RNS channels, stay constant for test
   parameter RNS_BW               = CH_BW * N_CHANNELS;                                                    //total RNS buswidth
-  parameter RNS_MOD              = {4'd5, 4'd7, 4'd10, 4'd11};//{32'd4294967291, 32'd4294967279, 32'd4294967231, 32'd4294967197};      //RNS channels
+  parameter RNS_MOD              = {32'd4294967291, 32'd4294967279, 32'd4294967231, 32'd4294967197};      //RNS channels
   
   // Test parameters
   parameter N_TESTS  = 2000;
@@ -18,29 +18,25 @@ module RNS_mult_tb(
   reg CLK = 1;
   reg  [CH_BW-1:0] A0;
   reg  [CH_BW-1:0] B0;
-  wire [CH_BW-1:0] M0;
-  wire  [CH_BW-1:0] Z0;
+  wire [CH_BW-1:0] Z0;
   
   reg correct0 = 0;
     
   reg  [CH_BW-1:0] A1;
   reg  [CH_BW-1:0] B1;
-  wire [CH_BW-1:0] M1;
-  wire  [CH_BW-1:0] Z1;
+  wire [CH_BW-1:0] Z1;
   
   reg correct1 = 0;
     
   reg  [CH_BW-1:0] A2;
   reg  [CH_BW-1:0] B2;
-  wire [CH_BW-1:0] M2;
-  wire  [CH_BW-1:0] Z2;
+  wire [CH_BW-1:0] Z2;
   
   reg correct2 = 0;
     
   reg  [CH_BW-1:0] A3;
   reg  [CH_BW-1:0] B3;
-  wire [CH_BW-1:0] M3;
-  wire  [CH_BW-1:0] Z3;
+  wire [CH_BW-1:0] Z3;
 
   reg correct3 = 0;
 
@@ -48,6 +44,7 @@ module RNS_mult_tb(
   wire ALLCORRECT = correct0 & correct1 & correct2 & correct3;
   
     //To separate moduli
+      wire [CH_BW-1:0] M0,M1,M2,M3;
   assign {M0,M1,M2,M3} = RNS_MOD;
   
 

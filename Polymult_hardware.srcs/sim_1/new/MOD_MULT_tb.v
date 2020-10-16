@@ -38,7 +38,6 @@ module MOD_MULT_tb(
     reg CLK = 1;
     reg  [CH_BW-1:0] A;
     reg  [CH_BW-1:0] B;
-    reg  [CH_BW-1:0] M = MOD;
     wire [CH_BW-1:0] Z;
     
     reg correct = 0;
@@ -46,7 +45,7 @@ module MOD_MULT_tb(
     reg [$clog2(N_TESTS)-1:0] TEST_NO       = -1;
     
     // instantiate RNS module    
-    MOD_MULT #(CH_BW,MOD)  uut (
+    MOD_MULT #(MOD)  uut (
     .A(A),
     .B(B),
     .Z(Z)
@@ -64,7 +63,7 @@ module MOD_MULT_tb(
     TEST_NO <= TEST_NO + 1;
     
     // Get correct answers
-    if (Z == (PRODUCT) % M) begin
+    if (Z == (PRODUCT) % MOD) begin
         correct <= 1;
         TOTAL_CORRECT <= TOTAL_CORRECT + 1;
     end

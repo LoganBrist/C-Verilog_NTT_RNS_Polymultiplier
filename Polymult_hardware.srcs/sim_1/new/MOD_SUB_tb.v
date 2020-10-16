@@ -35,7 +35,6 @@ module MOD_SUB_tb(
     reg CLK = 1;
     reg  [CH_BW-1:0] A;
     reg  [CH_BW-1:0] B;
-    reg  [CH_BW-1:0] M = MOD;
     wire [CH_BW-1:0] Z;
     
     reg correct = 0;
@@ -43,14 +42,13 @@ module MOD_SUB_tb(
     reg [$clog2(N_TESTS)-1:0] TEST_NO       = -1;
     
     // instantiate RNS module    
-    MOD_SUB #(CH_BW)  uut (
+    MOD_SUB #(MOD)  uut (
       .A(A),
       .B(B),
-      .M(M),
       .Z(Z)
      );
      
-     wire [CH_BW:0] SUB = A + M - B;
+     wire [CH_BW:0] SUB = A + MOD - B;
      
     // start clock 
     initial begin
@@ -61,7 +59,7 @@ module MOD_SUB_tb(
           CLK <= ~CLK;
           TEST_NO <= TEST_NO + 1;
           // Get correct answers
-          if (Z == (SUB) % M) begin
+          if (Z == (SUB) % MOD) begin
               correct <= 1;
               TOTAL_CORRECT <= TOTAL_CORRECT + 1;
           end
