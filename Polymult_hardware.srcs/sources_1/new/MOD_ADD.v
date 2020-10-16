@@ -20,7 +20,41 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module MOD_ADD #(
+module MOD_ADD 
+#(
+parameter MOD                  = 32'd4294967291,
+parameter integer IN_BW        = $clog2(MOD),               // Assumed, can be adjusted at instantiation. (HAVE TO ASSIGNING VALUE IF INPUT AND MODULUS ARE NOT EQUAL WIDTHS) 
+parameter integer OUT_BW       = $clog2(MOD)                // Always equal to MOD bitwidth
+
+)
+(
+input wire  [IN_BW-1:0] A,
+input wire  [IN_BW-1:0] B,
+output wire [OUT_BW-1:0] Z 
+);
+
+// Wires
+wire [IN_BW-1:0] SUM;
+wire [IN_BW-1:0] SUB;
+wire SUM_CARRY;
+wire SUB_CARRY;
+
+// Adder
+assign {SUM_CARRY,SUM} = A + B;
+
+// Subtractor
+assign {SUB_CARRY,SUB} = SUM - MOD;
+
+// Select 
+assign SEL = !(!SUM_CARRY & SUB_CARRY);
+
+// MUX
+assign Z = SEL ? SUB : SUM;
+
+
+/*
+// Version with MOD passed as input
+#(
 parameter integer CH_BW        = 32                //RNS channel bitwidth
 )
 (
@@ -29,19 +63,6 @@ input wire  [CH_BW-1:0] B,
 input wire  [CH_BW-1:0] M,
 output wire [CH_BW-1:0] Z 
 );
-
-/*
-reg [CH_BW:0] SUM = 0;
-always @(*) begin
-    SUM <= A + B;
-    if (SUM < M) begin
-        Z <= SUM;
-    end
-    else begin
-        Z <= SUM - M;
-    end
-end
-*/
 
 // Wires
 wire [CH_BW-1:0] SUM;
@@ -60,7 +81,7 @@ assign SEL = !(!SUM_CARRY & SUB_CARRY);
 
 // MUX
 assign Z = SEL ? SUB : SUM;
-
+*/
 
 
 

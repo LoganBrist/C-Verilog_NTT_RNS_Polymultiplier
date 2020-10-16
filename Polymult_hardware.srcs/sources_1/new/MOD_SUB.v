@@ -21,25 +21,26 @@
 
 
 module MOD_SUB #(
-    parameter integer CH_BW        = 32                //RNS channel bitwidth
+    parameter MOD                  = 32'd4294967291,
+    parameter integer IN_BW        = $clog2(MOD),               //Assumed, can be adjusted at instantiation
+    parameter integer OUT_BW       = $clog2(MOD)                //Always equal to MOD bitwidth
 )
 (
-    input wire  [CH_BW-1:0] A,
-    input wire  [CH_BW-1:0] B,
-    input wire  [CH_BW-1:0] M,
-    output wire [CH_BW-1:0] Z 
+    input wire  [IN_BW-1:0] A,
+    input wire  [IN_BW-1:0] B,
+    output wire [OUT_BW-1:0] Z 
 );
 
     // Wires
-    wire [CH_BW-1:0] SUM;
-    wire [CH_BW-1:0] SUB;
+    wire [OUT_BW-1:0] SUM;
+    wire [IN_BW-1:0] SUB;
     wire SUB_CARRY;
     
     // Adder
     assign {SUB_CARRY,SUB} = A - B;
     
     // Subtractor
-    assign SUM = SUB + M;
+    assign SUM = SUB + MOD;
     
     // MUX
     assign Z = SUB_CARRY ? SUM : SUB;
