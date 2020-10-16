@@ -48,7 +48,7 @@ module RNS_MULT
     genvar i;
     generate
         for (i = 0; i < N_CHANNELS; i = i + 1) begin
-            MOD_MULT #(CH_BW,RNS_MOD[i*CH_BW+:CH_BW]) add (.A(A[i*CH_BW+:CH_BW]),.B(B[i*CH_BW+:CH_BW]),.Z(Z[i*CH_BW+:CH_BW]));   //Using Barrett
+            MOD_MULT #(RNS_MOD[i*CH_BW+:CH_BW],CH_BW) mult (.A(A[i*CH_BW+:CH_BW]),.B(B[i*CH_BW+:CH_BW]),.Z(Z[i*CH_BW+:CH_BW]));   //Using Barrett
         end
     endgenerate
 endmodule

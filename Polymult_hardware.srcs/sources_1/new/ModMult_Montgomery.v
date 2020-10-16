@@ -21,24 +21,151 @@
 
 
 module RNS_modmult
+// this version represents values in both bases
 #(
 parameter CH_BW        = 32,                                 //RNS channel bitwidth
 parameter N_CHANNELS   = 4,                                  //Number of RNS channels
 parameter RNS_BW = CH_BW * N_CHANNELS,                       //total RNS buswidth
 parameter EXT_BW = CH_BW * (N_CHANNELS+1) ,                     //total RNS_EXT buswidth + m_r
-parameter RNS     = {32'd4294967291, 32'd4294967279, 
-                     32'd4294967231, 32'd4294967197},  //RNS channels
-parameter RNS_EXT = {32'd4294967189, 32'd4294967161,
-                     32'd4294967143, 32'd4294967111, 
-                                     32'd4294967087},  //extended RNS channels with redundant channel )
-//Table names
-parameter TABLE_D1_I_INV_RED_I = ""/*parameter = "TABLE_D1_I_INV_RED_I.txt"*/,
-parameter TABLE_D1_I_RED_J     = ""/*parameter = "TABLE_D1_I_RED_J.txt"*/
+parameter RNS     = {32'd4294967291, 32'd4294967279, 32'd4294967231, 32'd4294967197},  //RNS channels
+parameter RNS_EXT = {32'd4294967189, 32'd4294967161, 32'd4294967143, 32'd4294967111, 32'd4294967087},  //extended RNS channels with redundant channel 
+parameter TOTAL_RNS = {32'd4294967291, 32'd4294967279, 32'd4294967231, 32'd4294967197,32'd4294967189, 32'd4294967161, 32'd4294967143, 32'd4294967111, 32'd4294967087},
+parameter TOTAL_CH = N_CHANNELS*2 + 1,
+parameter TOTAL_BW = RNS_BW + EXT_BW
 )
 (
-input wire CLK,
-input wire [RNS_BW-1:0] A, //A & B are not input size 2n. They need base extended in parallel with q
-input wire [RNS_BW-1:0] B,
+input  wire CLK,
+input  wire [TOTAL_BW-1:0] A, 
+input  wire [TOTAL_BW-1:0] B,
+output wire [TOTAL_BW-1:0] Z
+);
+
+// This version is in both bases and is not pipelined  
+  //constants 
+    reg [RNS_BW-1:0] M_INV_RED_I  = 'h94708C202400771D532F537717C1BA40;
+    reg [EXT_BW-1:0] M_RED_J      = 'h0002512300025123000251230002512300025123;
+    reg [EXT_BW-1:0] D1_INV_RED_J = 'h9DE04F1F71F7DDBD4314D34AC67A7E125AF42B81;
+   
+    
+// 0. Get rid of montgomery factor
+ //reg [TOTAL_BW-1:0] D1         = 'h
+  // wire [TOTAL_BW-1:0] A_prime =
+
+// 1. Find X = A * B (in base i and j)
+   wire[TOTAL_BW-1:0] X; 
+   RNS_MULT #(CH_BW,TOTAL_CH,TOTAL_BW, TOTAL_RNS) mul0(A,B,X);
+   
+   wire [RNS_BW-1:0] X_i = X[RNS_BW-1:0];
+   wire [EXT_BW-1:0] X_j = X[TOTAL_BW-1:RNS_BW];
+   
+// 2. Find q in RNS base i
+   wire [RNS_BW-1:0] int, Q_i;
+   RNS_MULT #(CH_BW,N_CHANNELS,RNS_BW,RNS) mul(X_i, M_INV_RED_I, int);
+   RNS_SUB  #(CH_BW,N_CHANNELS,RNS_BW,RNS) sub(RNS,int,Q_i);
+   
+   
+// 3. Base extend q to q' in base j
+   wire [EXT_BW-1:0] Q_j;
+   BASE_EXTENSION_BAJARD #(CH_BW, N_CHANNELS, RNS_BW, EXT_BW, RNS, RNS_EXT) bex1 (Q_i, Q_j);
+
+   
+// 4. Find Z = (X_j + Q_j * M_RED_J) * D1_INV_RED_J in base j      //line 7 in masters report
+  wire [EXT_BW-1:0] int0, int1, Z_j;
+  RNS_MULT #(CH_BW, N_CHANNELS + 1, EXT_BW, RNS_EXT) m0( Q_j,   M_RED_J, int0); 
+  RNS_ADD  #(CH_BW, N_CHANNELS + 1, EXT_BW, RNS_EXT) a0(int0,       X_j, int1); 
+  RNS_MULT #(CH_BW, N_CHANNELS + 1, EXT_BW, RNS_EXT) m1(int1,D1_INV_RED_J,  Z_j); 
+  
+   
+// 5. Base extend Z to RNS base i 
+    wire [RNS_BW-1:0] Z_i; 
+    BASE_EXTENSION_SHENOY #(CH_BW, N_CHANNELS, RNS_BW, EXT_BW, RNS, RNS_EXT)  bex4 (Z_j, Z_i);
+    
+        
+    assign Z = {Z_i,Z_j};
+endmodule
+
+/* 
+// This version is in both bases and is pipelined  
+  //constants 
+    reg [RNS_BW-1:0] M_INV_RED_I  = 'h94708C202400771D532F537717C1BA40;
+    reg [EXT_BW-1:0] M_RED_J      = 'h0002512300025123000251230002512300025123;
+    reg [EXT_BW-1:0] D1_INV_RED_J = 'h9DE04F1F71F7DDBD4314D34AC67A7E125AF42B81;
+   
+    
+// 0. Get rid of montgomery factor
+ //reg [TOTAL_BW-1:0] D1         = 'h
+  // wire [TOTAL_BW-1:0] A_prime =
+
+// 1. Find X = A * B (in base i and j)
+   wire[TOTAL_BW-1:0] X; 
+   RNS_MULT #(CH_BW,TOTAL_CH,TOTAL_BW, TOTAL_RNS) mul0(A,B,X);
+   
+   wire [RNS_BW-1:0] X_i = X[RNS_BW-1:0];
+   wire [EXT_BW-1:0] X_j = X[TOTAL_BW-1:RNS_BW];
+   
+// 2. Find q in RNS base i
+   wire [RNS_BW-1:0] int, Q_i;
+   RNS_MULT #(CH_BW,N_CHANNELS,RNS_BW,RNS) mul(X_i, M_INV_RED_I, int);
+   RNS_SUB  #(CH_BW,N_CHANNELS,RNS_BW,RNS) sub(RNS,int,Q_i);
+   
+   // delay before bajard
+   wire [RNS_BW-1:0] Q_i_reg;
+   delay #(1, RNS_BW) d0 (CLK, Q_i, Q_i_reg);
+   
+   // parallel aside bajard 
+   wire [EXT_BW-1:0] X_j_reg;
+   delay #(2, EXT_BW) d3 (CLK, X_j, X_j_reg);
+   
+// 3. Base extend q to q' in base j
+   wire [EXT_BW-1:0] Q_j;
+   BASE_EXTENSION_BAJARD #(CH_BW, N_CHANNELS, RNS_BW, EXT_BW, RNS, RNS_EXT) bex1 (Q_i_reg, Q_j);
+
+   // delay after bajard
+   wire [RNS_BW-1:0] Q_j_reg;
+   delay #(1, RNS_BW) d1 (CLK, Q_j, Q_j_reg);
+   
+// 4. Find Z = (X_j + Q_j * M_RED_J) * D1_INV_RED_J in base j      //line 7 in masters report
+  wire [EXT_BW-1:0] int0, int1, Z_j;
+  RNS_MULT #(CH_BW, N_CHANNELS + 1, EXT_BW, RNS_EXT) m0( Q_j_reg,   M_RED_J, int0); 
+  RNS_ADD  #(CH_BW, N_CHANNELS + 1, EXT_BW, RNS_EXT) a0(int0,         X_j_reg, int1); 
+  RNS_MULT #(CH_BW, N_CHANNELS + 1, EXT_BW, RNS_EXT) m1(int1,D1_INV_RED_J,  Z_j); 
+
+   // delay before shenoy
+   wire [RNS_BW-1:0] Z_j_reg;
+   delay #(1, RNS_BW) d2 (CLK, Z_j, Z_j_reg);
+   
+   
+// 5. Base extend Z to RNS base i 
+    wire [RNS_BW-1:0] Z_i; 
+    BASE_EXTENSION_SHENOY #(CH_BW, N_CHANNELS, RNS_BW, EXT_BW, RNS, RNS_EXT)  bex4 (Z_j_reg, Z_i);
+    
+       // delay after shenoy
+    wire [RNS_BW-1:0] Z_j_reg;
+    delay #(1, RNS_BW) d4 (CLK, Z_i, Z_i_reg);
+
+       // delay parrallel shenoy
+    wire [RNS_BW-1:0] Z_j_par;
+    delay #(2, RNS_BW) d5 (CLK, Z_j, Z_j_par);
+        
+    assign Z = {Z_i_reg,Z_j_par};
+endmodule
+*/
+
+
+
+/* this version does a base conversion to get the second base of A and B
+#(
+parameter CH_BW        = 32,                                 //RNS channel bitwidth
+parameter N_CHANNELS   = 4,                                  //Number of RNS channels
+parameter RNS_BW = CH_BW * N_CHANNELS,                       //total RNS buswidth
+parameter EXT_BW = CH_BW * (N_CHANNELS+1) ,                     //total RNS_EXT buswidth + m_r
+parameter RNS     = {32'd4294967291, 32'd4294967279, 32'd4294967231, 32'd4294967197},  //RNS channels
+parameter RNS_EXT = {32'd4294967189, 32'd4294967161, 32'd4294967143, 32'd4294967111, 32'd4294967087}  //extended RNS channels with redundant channel 
+)
+(
+input  wire CLK,
+input  wire [RNS_BW-1:0] A, //A & B are not input size 2n. They need base extended in parallel with q
+input  wire [RNS_BW-1:0] B,
 output wire [RNS_BW-1:0] Z
 );
     
@@ -51,29 +178,21 @@ output wire [RNS_BW-1:0] Z
 // multiply by -n^-1
    
 // 2. Base extend q to q' in base j
-reg               run_bajard_flag = 0, run_shenoy_flag = 0;    //in
-wire              bajard_done_flag, shenoy_done_flag;       //out
 
 wire [EXT_BW-1:0] bajard_out;             //out
 wire [EXT_BW-1:0] shenoy_in;              
 wire [RNS_BW-1:0] shenoy_out;
 
 
-BASE_EXTENSION_BAJARD
-     #(CH_BW, N_CHANNELS, RNS_BW, EXT_BW, RNS, RNS_EXT, TABLE_D1_I_INV_RED_I, TABLE_D1_I_RED_J)
-      bex1 (CLK, Q_i, Q_j);
+BASE_EXTENSION_BAJARD #(CH_BW, N_CHANNELS, RNS_BW, EXT_BW, RNS, RNS_EXT) bex1 (Q_i, Q_j);
 
  //2b. Base Extend A and B
  wire [EXT_BW-1:0] A_ext, B_ext, E_j;
  wire bajard_done_flag2, bajard_done_flag3;
  
- BASE_EXTENSION_BAJARD
-     #(CH_BW, N_CHANNELS, RNS_BW, EXT_BW, RNS, RNS_EXT, TABLE_D1_I_INV_RED_I, TABLE_D1_I_RED_J)
-      bex2 (CLK, A, A_ext);
+ BASE_EXTENSION_BAJARD #(CH_BW, N_CHANNELS, RNS_BW, EXT_BW, RNS, RNS_EXT) bex2 (A, A_ext);
       
- BASE_EXTENSION_BAJARD
-     #(CH_BW, N_CHANNELS, RNS_BW, EXT_BW, RNS, RNS_EXT, TABLE_D1_I_INV_RED_I, TABLE_D1_I_RED_J)
-      bex3 (CLK, B, B_ext);
+ BASE_EXTENSION_BAJARD #(CH_BW, N_CHANNELS, RNS_BW, EXT_BW, RNS, RNS_EXT) bex3 (B, B_ext);
    
 // 3. Find Z = (X + q'M)D^-1 in base j //line 7 in masters report
    RNS_MULT #(CH_BW, N_CHANNELS + 1, EXT_BW, RNS_EXT) m0(A_ext,B_ext,E_j); 
@@ -88,8 +207,7 @@ BASE_EXTENSION_BAJARD
     
 // 4. Base extend Z to RNS base i  
   
-    BASE_EXTENSION_SHENOY      
-    #(CH_BW, N_CHANNELS, RNS_BW, EXT_BW, RNS, RNS_EXT)
-      bex4 (CLK, shenoy_in, Z);
+    BASE_EXTENSION_SHENOY #(CH_BW, N_CHANNELS, RNS_BW, EXT_BW, RNS, RNS_EXT)  bex4 (shenoy_in, Z);
     
 endmodule
+*/

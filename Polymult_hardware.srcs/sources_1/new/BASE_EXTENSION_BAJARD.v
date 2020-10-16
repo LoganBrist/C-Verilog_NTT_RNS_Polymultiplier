@@ -26,108 +26,61 @@ module BASE_EXTENSION_BAJARD
     parameter N_CHANNELS = 4,
     parameter RNS_BW     = CH_BW * N_CHANNELS,                 //total RNS buswidth 
     parameter EXT_BW     = CH_BW * (N_CHANNELS + 1),                     //total RNS_EXT buswidth + m_r
-    parameter RNS     = {32'd4294967291, 32'd4294967279, 32'd4294967231, 32'd4294967197},
-    parameter RNS_EXT = {32'd4294967189, 32'd4294967161, 32'd4294967143, 32'd4294967111, 32'd4294967087},
-    parameter TABLE_D1_I_INV_RED_I = ""/*"TABLE_D1_I_INV_RED_I.txt"*/,
-    parameter TABLE_D1_I_RED_J     = ""/*"TABLE_D1_I_RED_J.txt"*/
+    parameter RNS        = {32'd4294967291, 32'd4294967279, 32'd4294967231, 32'd4294967197},
+    parameter RNS_EXT    = {32'd4294967189, 32'd4294967161, 32'd4294967143, 32'd4294967111, 32'd4294967087}
     )
     (
-    input wire CLK,
-    input wire [RNS_BW-1:0] num_RNS,
-    output wire[EXT_BW-1:0] num_RNS_out
+    input wire [RNS_BW-1:0] A,
+    output wire[EXT_BW-1:0] Z
     );
     
     //assign num_RNS_out = num_RNS;
     
     
     //Precomputed tables 
-    reg [RNS_BW-1:0] D1_I_INV_RED_I [0:0]; //Holds one line, with channels (D1/i)^-1 mod m_i
-    reg [EXT_BW-1:0] D1_I_RED_J [N_CHANNELS-1:0]; //Holds i lines, with channels (D1/i) mod m_j/m_r
-
-
-    initial begin 
-        if(TABLE_D1_I_INV_RED_I != "")
-            $readmemh(TABLE_D1_I_INV_RED_I, D1_I_INV_RED_I);
-        if(TABLE_D1_I_RED_J != "")
-            $readmemh(TABLE_D1_I_RED_J, D1_I_RED_J);
-   end
-  
+    reg [RNS_BW-1:0] D1_I_INV_RED_I = 'hC91E9F844C3BA9F47DFD52886CA863AD; 
+    reg [RNS_BW-1:0] D1_I_RED_J0     = 'h00007620000489900009DC80001A7480;
+    reg [RNS_BW-1:0] D1_I_RED_J1     = 'h002E6800000085E00004FFB0000ABB40;
+    reg [RNS_BW-1:0] D1_I_RED_J2     = 'h001C584000314E8000011EE000086D30;
+    reg [RNS_BW-1:0] D1_I_RED_J3     = 'h001095C00027AEC00041BE000005E218;
+    reg [RNS_BW-1:0] D1_I_RED_J4     = 'h00106288001B070000375F0000561000;
+    
+    
+    //wire [RNS_BW-1:0] D1_I_INV_RED_I; //reg [RNS_BW-1:0] D1_I_INV_RED_I [N_CHANNELS-1:0];            
+    //wire [RNS_BW-1:0] D1_I_RED_0, D1_I_RED_1, D1_I_RED_2, D1_I_RED_3, D1_I_RED_4;               
+    //ROM #(RNS_BW, 1, FILENAME_D1_I_INV_RED_I, 1) rom0 (0, D1_I_INV_RED_I);
+    //ROM #(RNS_BW, N_CHANNELS+1,     FILENAME_D1_I_RED_J) rom1 (0, D1_I_RED_0);  
+    //ROM #(RNS_BW, N_CHANNELS+1,     FILENAME_D1_I_RED_J) rom2 (1, D1_I_RED_1);  
+    //ROM #(RNS_BW, N_CHANNELS+1,     FILENAME_D1_I_RED_J) rom3 (2, D1_I_RED_2); 
+    //ROM #(RNS_BW, N_CHANNELS+1,     FILENAME_D1_I_RED_J) rom4 (3, D1_I_RED_3);  
+    //ROM #(RNS_BW, N_CHANNELS+1,     FILENAME_D1_I_RED_J) rom5 (4, D1_I_RED_4);
+    
     //Step 1 - Calculate sigma (1 cycles)
     wire [RNS_BW-1:0] sigma;
-    RNS_MULT #(CH_BW, N_CHANNELS, RNS_BW, RNS) m(num_RNS, RNS, sigma); 
+    RNS_MULT #(CH_BW, N_CHANNELS, RNS_BW, RNS) m(A, D1_I_INV_RED_I, sigma); 
     
-    //Step 2 - Accumulate in base 2 (i cycles, j channels
-    wire [RNS_BW-1:0] out;
-    RNS_MAC #(CH_BW, N_CHANNELS, RNS_BW, RNS) mac1(CLK, sigma, RNS, reset, out);
+    //Step 2 - Accumulate t (i additions, j channels)
+    wire [CH_BW-1:0] out0, out1, out2, out3, out4;
+    RNS_MAC #(CH_BW, N_CHANNELS, RNS_BW, RNS_EXT[CH_BW*0 +: CH_BW]) mac0(sigma, D1_I_RED_J0, out0);
+    RNS_MAC #(CH_BW, N_CHANNELS, RNS_BW, RNS_EXT[CH_BW*1 +: CH_BW]) mac1(sigma, D1_I_RED_J1, out1);
+    RNS_MAC #(CH_BW, N_CHANNELS, RNS_BW, RNS_EXT[CH_BW*2 +: CH_BW]) mac2(sigma, D1_I_RED_J2, out2);
+    RNS_MAC #(CH_BW, N_CHANNELS, RNS_BW, RNS_EXT[CH_BW*3 +: CH_BW]) mac3(sigma, D1_I_RED_J3, out3);
+    RNS_MAC #(CH_BW, N_CHANNELS, RNS_BW, RNS_EXT[CH_BW*4 +: CH_BW]) mac4(sigma, D1_I_RED_J4, out4);
+  
+  
+    assign Z = {out0,out1,out2,out3,out4};
     
-    assign num_RNS_out = out;
-   
-    /*Old- has control logic for feeding variables. Worry about later
-    //Arithmetic block inputs
-    reg [RNS_BW-1:0] mult_in1, mult_in2, MAC_in1, MAC_in2;
-    wire [RNS_BW-1:0] sigma, MAC_out;
-    
-    // Bajard Stages
-    reg [31:0] stage = 0;
-    always @(posedge CLK) begin
-        if (do_not_run) begin
-           stage    <= 0;
-           mult_in1 <= 0;
-           mult_in2 <= 0;
-           MAC_in1  <= 0;
-           MAC_in2  <= 0;
-           result_ready <= 0;  
-           num_RNS_out <= num_RNS_out;            
+ /*
+    wire [EXT_BW-1:0] out;
+    genvar j;
+  
+    generate
+        for (j = 0; j < N_CHANNELS + 1; j = j + 1) begin
+            RNS_MAC #(CH_BW, N_CHANNELS, RNS_BW, RNS_EXT[CH_BW*j +: CH_BW]) mac(sigma, D1_I_RED_J, out);       
         end
-        
-        else if (run && stage == 0) begin
-           stage    <= 1;
-           mult_in1 <= num_RNS;
-           mult_in2 <= D1_I_INV_RED_I[0];
-           MAC_in1  <= 0;
-           MAC_in2  <= 0;
-           num_RNS_out <= num_RNS_out;            
-        
-        end
-        
-        else if (run && stage <= N_CHANNELS) begin
-           stage    <= stage + 1;
-           mult_in1 <= 0;
-           mult_in2 <= 0;
-           MAC_in1  <= sigma [(stage-2)*CH_BW +:CH_BW]; //goes through i channels
-           MAC_in2  <= D1_I_RED_J[stage-1]; //goes through i channels of j + m_r width
-           result_ready <= 0; 
-           num_RNS_out <= num_RNS_out; 
-        end
-        
-        else if (run && stage == N_CHANNELS + 1) begin
-           stage    <= stage + 1;
-           mult_in1 <= 0;
-           mult_in2 <= 0;
-           MAC_in1  <= sigma[(stage-2)*CH_BW +: CH_BW];  //j wide data  (+m_r)
-           MAC_in2  <= D1_I_RED_J[stage-1];           //j wide data (+m_r)
-           result_ready <= 0; 
-           num_RNS_out <= num_RNS_out;         
-        end
-        
-        else begin
-           stage    <= stage;
-           mult_in1 <= 0;
-           mult_in2 <= 0;
-           MAC_in1  <= 0;
-           MAC_in2  <= 0;
-           result_ready <= 1;
-           num_RNS_out <= MAC_out;            
-        end
-            
-    end
-    
-    //Step 1 - Calculate sigma (1 cycles)
-    RNS_MULT #(CH_BW, N_CHANNELS, RNS_BW, RNS) m(mult_in1, mult_in2, sigma); 
-    
-    //Step 2 - Accumulate in base 2 (i cycles, j channels)
-    RNS_MAC #(CH_BW, N_CHANNELS+1, EXT_BW, RNS_EXT) mac1(CLK,MAC_in1, MAC_in2, reset, MAC_out);
+    endgenerate
+  */
+  
 
-    //return Z_out
-    */
+   
 endmodule

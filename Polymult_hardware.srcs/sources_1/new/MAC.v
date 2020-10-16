@@ -36,6 +36,7 @@ module RNS_MAC
     
 
 /*
+//NON_MODULE VERSION:
              //repeat this loop j times for different Mi_j
    //multiply   
     genvar i;
@@ -48,9 +49,11 @@ module RNS_MAC
      endgenerate
 */
 
+
+//REDUCE-AT-END VERSION:
    //multiply   
     wire [RNS_BW-1:0] int_val; 
-    MOD_MULT #(CH_BW, MOD)  mult[N_CHANNELS-1:0] (.A(A), .B(B), .Z(int_val));
+    MOD_MULT #(MOD)  mult[N_CHANNELS-1:0] (.A(A), .B(B), .Z(int_val));
 
 //accumulate
     reg [CH_BW+N_CHANNELS-1:0] sum;
@@ -66,8 +69,26 @@ module RNS_MAC
     REDUCE #(CH_BW+N_CHANNELS-1,MOD) red (sum, Z);
 
 
-// NEED TO COMPARE: Regular additions with a reduction at the end VERSUS modular additions for each one. AFTER verification
+/*
+//REDUCE-AT-ADDS VERSION: (SLOWER)
+   //multiply   
+    wire [RNS_BW-1:0] int_val; 
+    MOD_MULT #(MOD)  mult[N_CHANNELS-1:0] (.A(A), .B(B), .Z(int_val));
 
+//accumulate and reduce
+    wire [CH_BW*(N_CHANNELS+1):0] sum;
+    assign sum[0 +:CH_BW] = int_val[0 +:CH_BW]; //initialize first val
+      genvar i;
+      generate
+          for (i = 0; i < N_CHANNELS-1; i = i + 1) begin                                                 
+            MOD_ADD #(MOD) add (sum[CH_BW*i +:CH_BW], int_val[CH_BW*(i+1) +:CH_BW], sum[CH_BW*(i+1) +:CH_BW]);       
+           end
+      endgenerate   
+        
+// Assign to output
+assign Z = sum[CH_BW*(N_CHANNELS-1) +:CH_BW];
+
+*/
      
 endmodule
 
