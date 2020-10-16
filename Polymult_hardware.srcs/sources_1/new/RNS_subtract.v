@@ -34,17 +34,20 @@ module RNS_SUB
     )
     ;
     
-    //assign Z = (A+RNS_MOD-B) % RNS_MOD;
-    
-    wire [RNS_BW-1:0] Y;
-    
-    genvar i;
-    generate
-        for (i = 0; i < N_CHANNELS; i = i + 1) begin
-            integer L = CH_BW*i;
-            assign Y[CH_BW*i+:CH_BW] = A[L+:CH_BW] + RNS_MOD[L+:CH_BW] - B[L+:CH_BW];
-            assign Z[CH_BW*i+:CH_BW] = Y[L+:CH_BW] % RNS_MOD[L+:CH_BW];
-        end
-    endgenerate
-    
+/*   
+   wire [RNS_BW-1+N_CHANNELS:0] Y;
+   
+   genvar i;
+   generate
+       for (i = 0; i < N_CHANNELS; i = i + 1) begin
+           integer L  = CH_BW*i;
+           integer Ly = (CH_BW+1)*i;
+           assign Y[(CH_BW+1)*i+:(CH_BW+1)] = A[L+:CH_BW] + RNS_MOD[L+:CH_BW];
+           assign Z[CH_BW*i+:CH_BW] = (Y[Ly+:(CH_BW+1)] - B[L+:CH_BW]) % RNS_MOD[L+:CH_BW];
+       end
+   endgenerate
+*/
+
+MOD_SUB #(CH_BW) add[N_CHANNELS-1:0] (.A(A),.B(B),.M(RNS_MOD),.Z(Z)); 
+   
 endmodule

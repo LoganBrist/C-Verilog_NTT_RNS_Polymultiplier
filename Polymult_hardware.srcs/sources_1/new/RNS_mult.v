@@ -33,6 +33,7 @@ module RNS_MULT
     output wire  [RNS_BW-1:0] Z
     );
 
+/*
     genvar index;
     generate
         for (index = 0; index < N_CHANNELS; index = index + 1) begin
@@ -40,8 +41,15 @@ module RNS_MULT
             assign Z[index*CH_BW+:CH_BW] = (A[L+:CH_BW] * B[L+:CH_BW]) % RNS_MOD[L+:CH_BW];
         end
     endgenerate
-    
-    //Problem: Z 0:4 is being assigned to each time and Z[L:CHBW] isn't allowed. How do you split the
-    //           wire assignent to parts of a singl bus? 
+*/    
+
+//MOD_MULT #(CH_BW,RNS_MOD) add[N_CHANNELS-1:0] (.A(A),.B(B),.Z(Z)); 
+
+    genvar i;
+    generate
+        for (i = 0; i < N_CHANNELS; i = i + 1) begin
+            MOD_MULT #(CH_BW,RNS_MOD[i*CH_BW+:CH_BW]) add (.A(A[i*CH_BW+:CH_BW]),.B(B[i*CH_BW+:CH_BW]),.Z(Z[i*CH_BW+:CH_BW]));   //Using Barrett
+        end
+    endgenerate
 endmodule
 

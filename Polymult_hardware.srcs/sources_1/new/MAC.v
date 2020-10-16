@@ -28,13 +28,14 @@ module RNS_MAC
     parameter MOD        = 32'd4294967291
     )
     (
-    input  wire CLK,
+    //input  wire CLK,
     input  wire [RNS_BW-1:0]  A,
     input  wire [RNS_BW-1:0]  B,
     output wire  [CH_BW-1:0]  Z
     );
     
 
+/*
              //repeat this loop j times for different Mi_j
    //multiply   
     genvar i;
@@ -45,7 +46,11 @@ module RNS_MAC
              assign int_val[CH_BW*i +:CH_BW] = (A[L+:CH_BW] * B[L+:CH_BW]) % MOD;        
           end
      endgenerate
+*/
 
+   //multiply   
+    wire [RNS_BW-1:0] int_val; 
+    MOD_MULT #(CH_BW, MOD)  mult[N_CHANNELS-1:0] (.A(A), .B(B), .Z(int_val));
 
 //accumulate
     reg [CH_BW+N_CHANNELS-1:0] sum;
@@ -56,7 +61,13 @@ module RNS_MAC
               sum = sum + int_val[CH_BW*idx +:CH_BW];
             end
      end
-           
-     assign Z = sum % MOD;
+     
+// Reduce sum to output Z          
+    REDUCE #(CH_BW+N_CHANNELS-1,MOD) red (sum, Z);
+
+
+// NEED TO COMPARE: Regular additions with a reduction at the end VERSUS modular additions for each one. AFTER verification
+
      
 endmodule
+
