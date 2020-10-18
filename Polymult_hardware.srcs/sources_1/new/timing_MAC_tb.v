@@ -22,9 +22,9 @@
 
 module timing_MAC_tb#(
     parameter integer CH_BW        = 32,                                                                    //RNS channel bitwidth
-    parameter integer N_CHANNELS   = 5,                                                                     //Number of RNS channels, stay constant for test
+    parameter integer N_CHANNELS   = 9,                                                                     //Number of RNS channels, stay constant for test
     parameter RNS_BW               = CH_BW * N_CHANNELS,                                                    //total RNS buswidth
-    parameter RNS_MOD              = {32'd4294967291, 32'd4294967279, 32'd4294967231, 32'd4294967197,32'd4294967189}// 32'd4294967161, 32'd4294967143, 32'd4294967111, 32'd4294967087}     //RNS channels
+    parameter RNS_MOD              = {32'd4294967291, 32'd4294967279, 32'd4294967231, 32'd4294967197,32'd4294967189, 32'd4294967161, 32'd4294967143, 32'd4294967111, 32'd4294967087}     //RNS channels
     )(
     input  wire  [RNS_BW-1:0] A,
     input  wire  [RNS_BW-1:0] B,
@@ -48,7 +48,8 @@ module timing_MAC_tb#(
     RNS_MAC #(CH_BW, N_CHANNELS, RNS_BW, RNS_MOD)  mac (
       .A(A_reg),
       .B(B_reg),
-      .Z(Z)
+      .Z(Z),
+      .CLK(CLK)
      );
      
  endmodule

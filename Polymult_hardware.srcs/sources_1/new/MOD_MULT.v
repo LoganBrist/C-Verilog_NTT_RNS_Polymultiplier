@@ -45,6 +45,7 @@ assign PROD    = A    * B;
 assign T       = PROD * m; 
 assign T_SHIFT = T >> k;
 assign PROD2   = T_SHIFT * MOD;
+
 assign RES     = PROD - PROD2;
 assign Z = (RES >= MOD) ? (RES - MOD) : RES;
 

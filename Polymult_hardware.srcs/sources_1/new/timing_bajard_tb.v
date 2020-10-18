@@ -46,7 +46,8 @@ module timing_bajard_tb#(
     // instantiate RNS module    
     BASE_EXTENSION_BAJARD #(CH_BW, N_CHANNELS, RNS_BW, EXT_BW, RNS, RNS_EXT)  bex (
         .A(A_reg),
-        .Z(Z)
+        .Z(Z),
+        .CLK(CLK)
      );
      
 endmodule
