@@ -1,0 +1,1 @@
+create_clock -name clk_virt -period 10
