@@ -37,9 +37,18 @@ module RNS_MAC
     
 
 //REDUCE-AT-END VERSION WITH PIPELINE:
+    // TOTAL DELAY: 3
+    
+    //input and output registers
+    wire [RNS_BW-1:0] A_ff, B_ff;
+    wire [CH_BW-1:0]  Z_ff;
+    delay #(1, RNS_BW) d2 (CLK, A, A_ff); 
+    delay #(1, RNS_BW) d3 (CLK, B, B_ff); 
+    delay #(1, CH_BW) d4  (CLK, Z_ff, Z); 
+    
    //multiply   
     wire [RNS_BW-1:0] int_val; 
-    MOD_MULT #(MOD)  mult[RNS_BW/CH_BW-1:0] (.A(A), .B(B), .Z(int_val));  //written this way -> RNS_BW/CH_BW <- because Shenoy MAC requires summing over 4 channels but on EXT_BW data. This ensures modmult is correct 
+    MOD_MULT #(MOD)  mult[RNS_BW/CH_BW-1:0] (.A(A_ff), .B(B_ff), .Z(int_val));  //written this way -> RNS_BW/CH_BW <- because Shenoy MAC requires summing over 4 channels but on EXT_BW data. This ensures modmult is correct 
 
 // Delay
 wire [RNS_BW-1:0] int_val_ff;
@@ -57,7 +66,7 @@ delay #(1, RNS_BW) d0 (CLK, int_val, int_val_ff);
      end
      
 // Reduce sum to output Z          
-    REDUCE #(CH_BW+N_CHANNELS,MOD) red (sum, Z);
+    REDUCE #(CH_BW+N_CHANNELS,MOD) red (sum, Z_ff);
 
 
 /*

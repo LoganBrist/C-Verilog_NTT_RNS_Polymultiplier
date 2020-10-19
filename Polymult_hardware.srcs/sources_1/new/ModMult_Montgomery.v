@@ -40,48 +40,83 @@ input  wire [TOTAL_BW-1:0] B,
 output wire [TOTAL_BW-1:0] Z
 );
 
+    // IO delay
+    wire [TOTAL_BW-1:0] A_ff, A_prime_ff, B_ff;
+    delay #(1, TOTAL_BW) A_input_delay_1 (CLK, A, A_ff);
+    delay #(2, TOTAL_BW) B_input_delay_2 (CLK, B, B_ff);
+        
 // This version is in both bases and is not pipelined  
   //constants 
     reg [RNS_BW-1:0] M_INV_RED_I  = 'h94708C202400771D532F537717C1BA40;
     reg [EXT_BW-1:0] M_RED_J      = 'h0002512300025123000251230002512300025123;
     reg [EXT_BW-1:0] D1_INV_RED_J = 'h9DE04F1F71F7DDBD4314D34AC67A7E125AF42B81;
-   
+    reg [TOTAL_BW-1:0] D1         = 'h9DE04F1F_71F7DDBD_4314D34A_C67A7E12_9DE04F1F_71F7DDBD_4314D34A_C67A7E12_5AF42B81;
     
 // 0. Get rid of montgomery factor
- //reg [TOTAL_BW-1:0] D1         = 'h
-  // wire [TOTAL_BW-1:0] A_prime =
-
+   wire [TOTAL_BW-1:0] A_prime;
+   RNS_MULT #(CH_BW,TOTAL_CH,TOTAL_BW, TOTAL_RNS) mul01(A_ff,D1,A_prime);
+    
+    //A mult delay
+    delay #(1, TOTAL_BW) A_prime_delay_1 (CLK, A_prime, A_prime_ff);
+    
 // 1. Find X = A * B (in base i and j)
    wire[TOTAL_BW-1:0] X; 
-   RNS_MULT #(CH_BW,TOTAL_CH,TOTAL_BW, TOTAL_RNS) mul0(A,B,X);
+   RNS_MULT #(CH_BW,TOTAL_CH,TOTAL_BW, TOTAL_RNS) mul0(A_prime_ff,B_ff,X);
    
-   wire [RNS_BW-1:0] X_i = X[RNS_BW-1:0];
-   wire [EXT_BW-1:0] X_j = X[TOTAL_BW-1:RNS_BW];
+   // X delay
+   wire [TOTAL_BW-1:0] X_ff;
+   delay #(1, TOTAL_BW) X_delay_1 (CLK, X, X_ff);
+   
+   wire [RNS_BW-1:0] X_i = X_ff[RNS_BW-1:0];
+   wire [EXT_BW-1:0] X_j = X_ff[TOTAL_BW-1:RNS_BW];
+   
+   // parallel to bajard delay
+   wire [EXT_BW-1:0] X_j_ff;
+   delay #(6, EXT_BW) X_delay_6 (CLK, X_j, X_j_ff);
+
    
 // 2. Find q in RNS base i
    wire [RNS_BW-1:0] int, Q_i;
    RNS_MULT #(CH_BW,N_CHANNELS,RNS_BW,RNS) mul(X_i, M_INV_RED_I, int);
-   RNS_SUB  #(CH_BW,N_CHANNELS,RNS_BW,RNS) sub(RNS,int,Q_i);
+   
+      // int delay
+   wire [RNS_BW-1:0] int_ff;
+   delay #(1, RNS_BW) int_delay_1 (CLK, int, int_ff);
+   
+   RNS_SUB  #(CH_BW,N_CHANNELS,RNS_BW,RNS) sub(RNS,int_ff,Q_i);
    
    
 // 3. Base extend q to q' in base j
    wire [EXT_BW-1:0] Q_j;
-   BASE_EXTENSION_BAJARD #(CH_BW, N_CHANNELS, RNS_BW, EXT_BW, RNS, RNS_EXT) bex1 (Q_i, Q_j);
+   BASE_EXTENSION_BAJARD #(CH_BW, N_CHANNELS, RNS_BW, EXT_BW, RNS, RNS_EXT) bex_delay_4 (Q_i, Q_j, CLK);
 
    
 // 4. Find Z = (X_j + Q_j * M_RED_J) * D1_INV_RED_J in base j      //line 7 in masters report
   wire [EXT_BW-1:0] int0, int1, Z_j;
   RNS_MULT #(CH_BW, N_CHANNELS + 1, EXT_BW, RNS_EXT) m0( Q_j,   M_RED_J, int0); 
-  RNS_ADD  #(CH_BW, N_CHANNELS + 1, EXT_BW, RNS_EXT) a0(int0,       X_j, int1); 
-  RNS_MULT #(CH_BW, N_CHANNELS + 1, EXT_BW, RNS_EXT) m1(int1,D1_INV_RED_J,  Z_j); 
+  
+    // int0 delay
+    wire [EXT_BW-1:0] int0_ff;
+    delay #(1, EXT_BW) int0_delay_1 (CLK, int0, int0_ff);
+
+  RNS_ADD  #(CH_BW, N_CHANNELS + 1, EXT_BW, RNS_EXT) a0(int0_ff,    X_j_ff, int1); 
+  
+  // int1 delay
+  wire [EXT_BW-1:0] int1_ff;
+  delay #(1, EXT_BW) int1_delay_1 (CLK, int1, int1_ff);
+  
+  RNS_MULT #(CH_BW, N_CHANNELS + 1, EXT_BW, RNS_EXT) m1(int1_ff, D1_INV_RED_J,  Z_j); 
   
    
 // 5. Base extend Z to RNS base i 
     wire [RNS_BW-1:0] Z_i; 
-    BASE_EXTENSION_SHENOY #(CH_BW, N_CHANNELS, RNS_BW, EXT_BW, RNS, RNS_EXT)  bex4 (Z_j, Z_i);
+    BASE_EXTENSION_SHENOY #(CH_BW, N_CHANNELS, RNS_BW, EXT_BW, RNS, RNS_EXT)  bex_delay_6 (Z_j, Z_i, CLK);
     
-        
-    assign Z = {Z_i,Z_j};
+    //parallel to shenoy delay
+    wire [EXT_BW-1:0] Z_j_ff;
+    delay #(6, EXT_BW) Z_delay_6 (CLK, Z_j, Z_j_ff);
+    
+    assign Z = {Z_i,Z_j_ff};
 endmodule
 
 /* 

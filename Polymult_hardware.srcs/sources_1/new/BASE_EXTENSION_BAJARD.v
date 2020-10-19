@@ -36,6 +36,12 @@ module BASE_EXTENSION_BAJARD
     output wire[EXT_BW-1:0] Z,
     input wire CLK
     );
+    
+   //TOTAL DELAY: 4
+   //IO delay 
+   wire [RNS_BW-1:0] A_ff;
+   delay #(1, RNS_BW) d0 (CLK, A, A_ff); 
+
    
    // Constant memory
    reg [RNS_BW-1:0] D1_I_INV_RED_I [0:0];
@@ -54,7 +60,7 @@ module BASE_EXTENSION_BAJARD
   
   //Step 1 - Calculate sigma (1 cycles)
   wire [RNS_BW-1:0] sigma;
-  RNS_MULT #(CH_BW, N_CHANNELS, RNS_BW, RNS) m(A, D1_I_INV_RED_I [0], sigma); 
+  RNS_MULT #(CH_BW, N_CHANNELS, RNS_BW, RNS) m(A_ff, D1_I_INV_RED_I [0], sigma); 
   
   
   
