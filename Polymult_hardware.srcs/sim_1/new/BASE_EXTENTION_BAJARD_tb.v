@@ -44,7 +44,8 @@ module BASE_EXTENTION_BAJARD_tb(
     
     
     reg CLK = 0;
-    reg [RNS_BW-1:0] A = {32'd0,32'd0,32'd0,32'd0};
+    //reg [RNS_BW-1:0] A = {32'd0,32'd0,32'd0,32'd0};
+    reg [RNS_BW-1:0] A = {32'hFFFFFE63,32'hFFFFFE6F,32'hFFFFFE9F,32'hFFFFFEC1};
     wire [EXT_BW-1:0] Z;
     
     
@@ -60,7 +61,7 @@ module BASE_EXTENTION_BAJARD_tb(
           CLK <= ~CLK;
           #1
           CLK <= ~CLK; 
-          A <= {i,i,i,i}; 
+          A <= A + {1,1,1,1}; //{i,i,i,i}; 
        end
     end
 endmodule
