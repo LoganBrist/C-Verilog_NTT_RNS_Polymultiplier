@@ -16,12 +16,13 @@ using namespace std;
 ///////////////////////////////////////////////////////////////
 
 void NTT::printParameters() {
+    
     cout << "Entered modulus:" << min_mod << endl; 
     cout << "Used modulus:" << modulus << endl;
     cout << "n:" << vec_length << endl;
     cout << "nth root of unity:" << w_n << endl;
     cout << "nth root inverse:" << w_n_inv << endl << endl;
-
+    
 
 }
 
@@ -150,10 +151,41 @@ vector<BigUnsigned> NTT::solveParameters(BigUnsigned vector_length, BigUnsigned 
 }
 ///////////////////////////////////////////////////////////////////////////////
 // radix-2 Butterfly
+//
+// These two butterfly functions are currently in RNS.cpp 
 ///////////////////////////////////////////////////////////////////////////////
-void NTT::butterfly(BigUnsigned* left_val, BigUnsigned* right_val) {
-    *left_val  = (*left_val + *right_val) % modulus;
-    *right_val = (*left_val + modulus - *right_val) % modulus;
+
+vector<BigUnsigned> NTT::butterfly(BigUnsigned left, BigUnsigned right, BigUnsigned twiddlefactor, BigUnsigned modulus) {
+    /*
+    BigUnsigned product, left_out, right_out;
+
+    product = (right * twiddlefactor) % modulus;
+
+    left_out  = (left + product) % modulus;
+    right_out = (left + modulus - product) % modulus;
+
+    return vector<BigUnsigned> {left_out, right_out};
+    */
+    return vector<BigUnsigned> {0};
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// radix-2 RNS Butterfly
+//
+// These two butterfly functions are currently in RNS.cpp
+///////////////////////////////////////////////////////////////////////////////
+vector<vector<BigUnsigned>> NTT::butterfly_rns(vector<BigUnsigned> left, vector<BigUnsigned> right, vector<BigUnsigned> twiddlefactor) {
+    /*
+    vector<BigUnsigned> product, left_out, right_out;
+
+    product = rns.modmult_RNS(right, twiddlefactor);
+
+    left_out  = rns.add_RNS(left, right, rns.bases);
+    right_out = rns.sub_RNS(left, right, rns.bases);
+
+    return vector<vector<BigUnsigned>> {left_out, right_out};
+    */
+    return vector<vector<BigUnsigned>> {{0}};
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -176,9 +208,9 @@ void NTT::butterfly(BigUnsigned* left_val, BigUnsigned* right_val) {
             val += A[j] * pow_mod(omeg, i * j, modulus);
         }
         Z.push_back(val % modulus);
-        cout << i * 100 / vec_len << "% of studid NTT done.\r";
+        //cout << i * 100 / vec_len << "% of studid NTT done.\r";
     }
-    cout << "100% of studid NTT done." << endl;
+    //cout << "100% of studid NTT done." << endl;
 
     if (inverse) {
         Z = hadamard_product(Z, constant_vector(vec_len, mod_inverse(vec_len,modulus)), modulus);
@@ -200,15 +232,15 @@ vector<BigUnsigned> NTT::calculate(vector<BigUnsigned> A, bool inverse) {
 
     BigUnsigned temp = 1;
     BigUnsigned omeg = w_n;
+    
     if (inverse)
         omeg = w_n_inv;
 
     for (int i = 0; i < n / 2; i++) {
         powtable.push_back(temp);
-        temp = temp * omeg % modulus;
+        temp = (temp * omeg) % modulus;
     }
 
-    printVector(powtable);
     A = bitReverse(A);
 
     int size = 2;
@@ -223,23 +255,23 @@ vector<BigUnsigned> NTT::calculate(vector<BigUnsigned> A, bool inverse) {
             for (int start = i; start < i + halfsize; start++) {
                 int end = start + halfsize;
                 BigUnsigned left = A[start];
-                cout << "addr1: " << start << " addr2: " << end << endl;
-                cout << "in1: " << A[start] << "   in2: " << A[end] << "      " << "  phi: " << powtable[k] << endl;
+
+                vector<BigUnsigned> bf = rns.butterfly(A[start], A[end], powtable[k], modulus);
+                A[start] = bf[0];
+                A[end]   = bf[1];
+                /*
                 BigUnsigned right = (A[end] * powtable[k]) % modulus; 
                 A[start] = (left + right) % modulus;
                 A[end]   = (left + modulus - right) % modulus;
-                cout << "out1: " << A[start] << "   out2: " << A[end] << endl << endl;
+                */
                 k += tablestep;
             }
-            count++;
-         //cout << count*100/n << "% of butterfly NTT done.\r";
         }
-        
         size += size;  // size = size * 2
     }
     
-
-    cout << "100% of butterfly NTT done." << endl;
+    //cout << "100% of butterfly NTT done." << endl;
+    
     if (inverse)
         A = hadamard_product(A, constant_vector(n, mod_inverse(n, modulus)), modulus);
     return A;
@@ -274,77 +306,102 @@ vector<vector<BigUnsigned>> NTT::calculate_rns(vector<vector<BigUnsigned>> A, bo
     int size  = 2;
     int count = 0;
 
+    bool flag1, flag2;
+
     while (size <= n) {
         int halfsize = size / 2;
         int tablestep = n / size;
 
-        for (int i = 0; i < n; i += size) {
-            int  k = 0;
-            for (int start = i; start < i + halfsize; start++) {
-                int end = start + halfsize;
-                vector<BigUnsigned> left = A[start];
-                vector<BigUnsigned> right = rns.modmult_RNS(A[end], powtable[k]);
-                A[start] = rns.add_RNS(left,right, rns.bases);
-                A[end]   = rns.sub_RNS(left,right, rns.bases);
-                k += tablestep;
-            }
-            count++;
-            cout << count*100/n << "% of RNS butterfly NTT done.\r";
+        ///////////////////////////////////////////////////////////////
+        // IMPORTANT ADDED: corrects only at last run
+        ///////////////////////////////////////////////////////////////
+        // Correct output on last run(saves flag value for reset later)
+        if ((size == n) && (CORRECT_LAST_NTT_RUN)) {
+            flag1 = rns.MULTIPLY_MODMULT_INPUT_BY_D;
+            flag2 = rns.CORRECT_MODMULT_OUTPUT;
+
+            rns.MULTIPLY_MODMULT_INPUT_BY_D = true;
+            rns.CORRECT_MODMULT_OUTPUT      = true;
         }
 
+        for (int i = 0; i < n; i += size) {
+            int  k = 0;
+            
+            for (int start = i; start < i + halfsize; start++) {
+                int end = start + halfsize;
+
+                vector<vector<BigUnsigned>> bf = rns.butterfly_rns(A[start], A[end], powtable[k]);
+
+                A[start] = bf[0];
+                A[end]   = bf[1];
+
+                k += tablestep;
+            }
+            //count++;
+           //cout << count*100/n << "% of RNS butterfly NTT done.\r";
+        }
         size += size;  // size = size * 2
     }
 
+    if (CORRECT_LAST_NTT_RUN) {
+        rns.MULTIPLY_MODMULT_INPUT_BY_D = flag1;
+        rns.CORRECT_MODMULT_OUTPUT      = flag2;
+    }
 
-    cout << "100% of butterfly NTT done." << endl;
-    //if (inverse)
-        //A = hadamard_product(A, constant_vector(n, mod_inverse(n, modulus)), modulus); //needs to make rns functions
+   // cout << "100% of butterfly NTT done." << endl;
+    
+    if (inverse) {
+        vector<vector<BigUnsigned>> B = rns.constant_vector_RNS(n, mod_inverse(n, modulus), rns.bases);
+        A = rns.hadamard_product_RNS(A, B);  //is reduced internally
+    }
     return A;
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// Tests forw/inv for reference NTT and custom NTT on vector A
+// Tests RNS NTT versus standard NTT
 /////////////////////////////////////////////////////////////////////////////
 void NTT::NTT_test(int n_tests) {
     int n_correct = 0;
     cout << endl << endl << "NTT TEST:" << endl << endl;
     for (int i = 0; i < n_tests; i++) {
+        cout << "TEST " << i << ":" << endl;
         //variables
-        vector<BigUnsigned> A, Z, ans;
+        vector<BigUnsigned> A, ans_stupid, ans_bf, Z, Z_red;
         vector<vector<BigUnsigned>> A_rns, Z_rns;
 
         //generate random polynomial
         A     = sample_polynomial(vec_length, modulus);
         A_rns = rns.forwardConverter_polynomial(A, rns.bases);
 
-        printVector(A, "Test polynomial:");
-        cout << endl;
-
         //reference NTT
-        ans = stupidcalculate(A);
-        printVector(ans, "Correct NTT: ");
+        //ans_stupid = stupidcalculate(A); 
 
-        // efficient NTT
+        //butterfly NTT
+        ans_bf = calculate(A);   //Is currently identical to stupid calculate. Use this for reference.
+
+        //RNS butterfly NTT
         Z_rns = calculate_rns(A_rns);
-        Z = rns.reverseConverter_polynomial(Z_rns, rns.bases);
-        printVector(Z, "Test NTT: ");
-        cout << endl;
-       
-        //Z = stupidcalculate(Z, true);
-        //printVector(Z, "result:");
-        //Z = calculate(Z, true);
-        //printVector(Z, "result:");
-        //cout << endl;
 
-        if (vectorsAreEqual(ans, Z)) {
-            cout << "Correct." << endl << endl;
+        //convert result
+        Z     = rns.reverseConverter_polynomial(Z_rns, rns.bases);
+  
+        //reduce all values by the modulus to finalize RNS calculation
+        for (int i = 0; i < Z.size(); i++) {
+            Z_red.push_back(Z[i] % rns.M);
+        }
+
+        if (vectorsAreEqual(Z, ans_bf)) {
+            cout << "RNS NTT correct." << endl;
             n_correct++;
         }
-
-        else {
-            cout << "Incorrect." << endl << endl;
+        else if (vectorsAreEqual(Z_red, ans_bf)) {
+             cout << "RNS NTT correct if reduced." << endl;
+             n_correct++;
         }
-        
+        else {
+           cout << "RNS NTT incorrect." << endl;
+        }
+       
     }
 
     cout << n_correct << "/" << n_tests << " tests correct." << endl << endl;

@@ -15,6 +15,8 @@ class NTT
 
 		RNS rns;
 
+		bool CORRECT_LAST_NTT_RUN = true; // corrects modmult output to be exact on the last stage
+
 		BigUnsigned vec_length;  //  Size of the transform and "n" in the nth root of unity.
 		std::vector<BigUnsigned> phi_table; //bit reversed powers of phi
 		
@@ -25,19 +27,22 @@ class NTT
 		std::vector<std::vector<BigUnsigned>> calculate_rns(std::vector<std::vector<BigUnsigned>> A, bool inverse = false);
 		std::vector<BigUnsigned> stupidcalculate(std::vector<BigUnsigned> A, bool inverse = false);
 		static BigUnsigned find_root_of_unity2(BigUnsigned vec_length, BigUnsigned modulus);
+		
 		void NTT_test(int n_tests);
 		std::vector<BigUnsigned> static solveParameters(BigUnsigned vector_length, BigUnsigned mod, bool modulusIsPrimeIPromse = false);
 		void printParameters();
 
-	private:
+	//private:
 		static bool is_generator(BigUnsigned val, BigUnsigned totient, BigUnsigned mod);
 		static BigUnsigned find_generator(BigUnsigned totient, BigUnsigned mod);
 		BigUnsigned find_root_of_unity(BigUnsigned vec_length, BigUnsigned modulus);
 		std::vector<BigUnsigned> constant_vector(BigUnsigned length, BigUnsigned val);
 		std::vector<BigUnsigned> mult_by_power(std::vector<BigUnsigned> in, BigUnsigned val, BigUnsigned modulus);
 		std::vector<BigUnsigned> static generate_phi_table(BigUnsigned n, BigUnsigned w_n, BigUnsigned modulus);
-		void NTT::butterfly(BigUnsigned* left_val, BigUnsigned* right_val);
 		
+		std::vector<BigUnsigned> butterfly(BigUnsigned left, BigUnsigned right, BigUnsigned twiddlefactor, BigUnsigned modulus );
+		std::vector<std::vector<BigUnsigned>> butterfly_rns(std::vector<BigUnsigned> left, std::vector<BigUnsigned> right, std::vector<BigUnsigned> twiddlefactor);
+
 };
 
 void save_twiddle_table(char* savename, BigUnsigned NTT_size, BigUnsigned w_n, BigUnsigned mod);

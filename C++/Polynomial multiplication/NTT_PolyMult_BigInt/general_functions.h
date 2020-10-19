@@ -8,6 +8,8 @@
 
 bool vectorsAreEqual(std::vector<BigUnsigned> a, std::vector<BigUnsigned> b);
 
+BigUnsigned pow(BigUnsigned base, BigUnsigned pow);
+
 BigUnsigned product(std::vector<BigUnsigned> vec);
 
 BigUnsigned getRandomBigUnsigned(BigUnsigned range);
@@ -33,11 +35,11 @@ BigUnsigned sqrt_mod(BigUnsigned A, BigUnsigned mod);
 
 
 
-void printVector(std::vector<BigUnsigned> list, std::string name = "", bool printFullVector = false);
-
-void saveValToTextfile(BigUnsigned val, std::string savename = "");
-void saveVectorToTextfile(std::vector<BigUnsigned> vec, std::string savename = "",bool writeOnOneLine = false, int val_width = 5);
-void saveVectorVectorToTextfile(std::vector<std::vector<BigUnsigned>> vec, std::string savename = "");
+void printVector(std::vector<BigUnsigned> list, std::string name = "", bool printFullVector = false, bool inHex = false, int hexVal_bitwidth = 0);
+void printVal(BigUnsigned val, std::string name, bool makeNewLine, bool inHex, int hexVal_bitwidth);
+void saveValToTextfile(BigUnsigned val, std::string savename = "", int hex_bitwidth = 0);
+void saveVectorToTextfile(std::vector<BigUnsigned> vec, std::string savename = "",bool writeOnOneLine = false, int hex_bitwidth = 0);
+void saveVectorVectorToTextfile(std::vector<std::vector<BigUnsigned>> vec, std::string savename = "", int hex_bitwidth = 0);
 
 BigUnsigned gcd(BigUnsigned A, BigUnsigned B);
 

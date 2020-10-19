@@ -7,6 +7,18 @@
 
 using namespace std;
 
+
+//////////////////////////////////////////////////////////////////////////////
+// Manual exponentiation
+//
+///////////////////////////////////////////////////////////////////////////////
+BigUnsigned pow(BigUnsigned base, BigUnsigned pow) {
+    BigUnsigned t = 1;
+    for (BigUnsigned i = 0; i < pow; i++) {
+        t *= base;
+    }
+    return t;
+}
 //////////////////////////////////////////////////////////////////////////////
 // Returns product of values in the vector
 //
@@ -272,15 +284,18 @@ BigUnsigned sqrt_mod(BigUnsigned A, BigUnsigned mod) {
 }
 
 ///////////////////////////////////////////////////////////////
-// Print Vector
+// Print Vector / Val
 // prints contents of an integer only vector
 ///////////////////////////////////////////////////////////////
-void printVector(vector<BigUnsigned> list, string name, bool printFullVector) {
+void printVector(vector<BigUnsigned> list, string name, bool printFullVector, bool inHex, int hexVal_bitwidth) {
+    // print optional text before line 
     cout << name;
     int len = list.size();
 
     //print vector ends
     if (!printFullVector && (len > 6)) {
+        if (inHex)
+            cout << hex << setfill('0') << setw(hexVal_bitwidth/4);
         cout << list[0] << ' ' << list[1] << ' ' << list[2] << " ... ";
         cout << list[len - 3] << ' ' << list[len - 2] << ' ' << list[len-1] << endl;
     }
@@ -288,53 +303,74 @@ void printVector(vector<BigUnsigned> list, string name, bool printFullVector) {
     //print whole vector 
     else {
         for (int i = 0; i < list.size(); i++) {
+            if (inHex)
+                cout << hex << setfill('0') << setw(hexVal_bitwidth / 4);
             cout << list[i] << ' ';
         }
         cout << endl;
     }
 }
 
+void printVal(BigUnsigned val, string name, bool makeNewLine, bool inHex, int hexVal_bitwidth) {
+    // print optional text before line 
+    cout << name;
+
+    //print val 
+    if (inHex)
+        cout << hex << setfill('0') << setw(hexVal_bitwidth / 4);
+    cout << val;
+    if (makeNewLine)
+        cout << endl;
+}
+
 ///////////////////////////////////////////////////////////////
 // Save vector to text file
 // 
 ///////////////////////////////////////////////////////////////
-void saveValToTextfile(BigUnsigned val, string savename) {
+void saveValToTextfile(BigUnsigned val, string savename, int hex_bitwidth) {
     ofstream file;
     file.open(savename);
-    file << hex << setfill('0') << val << "\n";
+    file << hex << setfill('0') << setw(hex_bitwidth / 4) << val << "\n";
     file.close();
 }
 
-void saveVectorToTextfile(vector<BigUnsigned> vec, string savename, bool WriteOnOneLine, int val_width) {
+void saveVectorToTextfile(vector<BigUnsigned> vec, string savename, bool WriteOnOneLine, int hex_bitwidth) {
     ofstream file;
     file.open(savename);
     
     if (WriteOnOneLine) {
         for (int i = 0; i < vec.size(); i++) {
-            file << hex << setfill('0') << setw(val_width) << vec[i] << "\n";
+            file << hex << setfill('0') << setw(hex_bitwidth/4) << vec[i] << "\n";
         }
     }
 
     else {
         for (int i = 0; i < vec.size(); i++) {
-            file << hex << setfill('0') << vec[i] << "\n";
+            file << hex << setfill('0') << setw(hex_bitwidth / 4) << vec[i] << "\n";
         }
     }
 
     file.close();
 }
 
-void saveVectorVectorToTextfile(vector<vector<BigUnsigned>> vec, string savename) {
+void saveVectorVectorToTextfile(vector<vector<BigUnsigned>> vec, string savename, int hex_bitwidth) {
     ofstream file;
     file.open(savename);
 
-    for (int i = 0; i < vec.size(); i++) {
-        for (int j = 0; j < vec[i].size(); j++) {
-            file << hex << setfill('0') << vec[i][j] << "\n";
+    for (int j = 0; j < vec[0].size(); j++) {
+        file << "'h";
+        for (int i = 0; i < vec.size(); i++) {
+            file << hex << setfill('0') << setw(hex_bitwidth / 4) << vec[i][j];
+            if (i != vec.size() - 1)
+                file << "_";
         }
+        if (j != vec[0].size() - 1)
+            file << ", ";
     }
+    
     file.close();
 }
+
 
 ///////////////////////////////////////////////////////////////
 // Coprime tests

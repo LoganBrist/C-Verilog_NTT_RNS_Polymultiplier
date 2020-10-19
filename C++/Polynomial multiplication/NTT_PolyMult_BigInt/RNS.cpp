@@ -16,6 +16,91 @@ BigUnsigned RNS::getDynamicRange(vector<BigUnsigned> base) {
     return product(base);
 }
 
+///////////////////////////////////////////////////////////////
+// Print RNS Value or Vector
+// prints contents of an RNS vector in RNS or vector form
+///////////////////////////////////////////////////////////////
+void RNS::printRNSval(vector<BigUnsigned> val_rns, vector<BigUnsigned> base, bool printInIntform, string name) {
+    cout << name;
+    if (printInIntform == false) {
+        for (int i = 0; i < val_rns.size(); i++) {
+            cout << val_rns[i];
+            if (i != val_rns.size() - 1)
+                cout << "|";
+        }
+    }
+    else {
+        cout << reverseConverter(val_rns, base) << ' ';
+    }
+}
+void RNS::printRNSvector(vector<vector<BigUnsigned>> list_rns, string name, vector<BigUnsigned> base, bool printInIntform, bool printFullVector)
+{
+    //If printing vector in integer form
+    if (printInIntform == true) {
+        vector<BigUnsigned> list = reverseConverter_polynomial(list_rns, base);
+        printVector(list, name, printFullVector);
+    }
+
+    //If printing vector in RNS form
+    if (printInIntform == false) {
+        cout << name;
+
+        int len = list_rns.size();
+
+        //If printing RNS vector ends
+        if (!printFullVector && (len > 6)) {
+            printRNSval(list_rns[0]);
+            cout << '|';
+            printRNSval(list_rns[1]);
+            cout << '|';
+            printRNSval(list_rns[2]);
+            cout << " ... ";
+            printRNSval(list_rns[len - 3]);
+            cout << '|';
+            printRNSval(list_rns[len - 2]);
+            cout << '|';
+            printRNSval(list_rns[len - 1]);
+            cout << endl;
+        }
+
+        //If printing whole RNS vector 
+        else {
+            for (int i = 0; i < list_rns.size(); i++) {
+                printRNSval(list_rns[i]);
+                cout << ' ';
+            }
+            cout << endl;
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+//Create constant vector of RNS values
+///////////////////////////////////////////////////////////////////////////////
+vector<vector<BigUnsigned>> RNS::constant_vector_RNS(BigUnsigned length, BigUnsigned val, vector<BigUnsigned> base) {
+    vector<BigUnsigned> val_rns = forwardConverter(val, base);
+    vector<vector<BigUnsigned>> Z;
+    for (BigUnsigned i = 0; i < length; i++) {
+        Z.push_back(val_rns);
+    }
+    return Z;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Modular Hadamard Product
+
+// pointwise modular multiplication between vectors (to use RNS_mult function here)
+// The modulus is whatever is assigned at initialization 
+///////////////////////////////////////////////////////////////////////////////
+vector<vector<BigUnsigned>> RNS::hadamard_product_RNS(vector<vector<BigUnsigned>> A, vector<vector<BigUnsigned>> B) {
+    vector<vector<BigUnsigned>> Z;
+
+    for (int i = 0; i < A.size(); i++) {
+        Z.push_back(modmult_RNS(A[i], B[i]));
+    }
+
+    return Z;
+}
 ///////////////////////////////////////////////////////////////////////////////
 // Returns values where the RNS sytem is 1|0|0, 0|1|0, 0|0|1, etc.
 
@@ -29,8 +114,8 @@ vector<BigUnsigned> RNS::getSingleResidues(vector<BigUnsigned> mod) {
 
     for (int i = 0; i < mod.size(); i++) {
 
-        BigUnsigned interval = BigUnsigned(dr / mod[i]);  // search in increments of dR/mod. It's the product of all the other moduli (so their residue is 0) 
-    
+        BigUnsigned interval = BigUnsigned(dr / mod[i]);  // search in increments of dR/mod. It's the product of all the other moduli (so their residue is 0)
+
         for (BigUnsigned num = interval; num <= dr; num += interval) {
             cout << "getSingleResidues() currently searching bits " << num.bitLength() << " out of " << dR_bitLength << " for channel " << i << ".\r";
             if (num % mod[i] == 1) {                                   //needs to be made more efficient for large dR. Is efficient for num up to 280 bits.
@@ -39,7 +124,7 @@ vector<BigUnsigned> RNS::getSingleResidues(vector<BigUnsigned> mod) {
                 break;
             }
         }
-        
+
     }
     cout << "                                                                                           " << endl;
     return vals;
@@ -50,14 +135,23 @@ vector<BigUnsigned> RNS::getSingleResidues(vector<BigUnsigned> mod) {
 ///////////////////////////////////////////////////////////////////////////////
 vector<BigUnsigned> RNS::forwardConverter(BigUnsigned num, vector<BigUnsigned> base) {
     vector<BigUnsigned> num_RNS;
+
     for (int i = 0; i < base.size(); i++) { //n_moduli
         num_RNS.push_back(num % base[i]);
     }
+
     return num_RNS;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // Converts RNS to integer representation
+//
+// The converter uses whichever weights are associated with the base, if they exist.
+// Otherwise the weights are calculated on the spot and is very time consuming. Function always
+// looks at the starting indices of num_RNS so you can pass a very long RNS number and
+// only get its reconversion for base1 if, for example, it is the concatenation of base1
+// and base2 out of the modmult module. However, you cannot get base2 conversion without first 
+// separaing it into another vector where base2 are the first results in the input vector.
 ///////////////////////////////////////////////////////////////////////////////
 BigUnsigned RNS::reverseConverter(vector<BigUnsigned> num_RNS, vector<BigUnsigned> base) {
     //select weights to use
@@ -68,18 +162,18 @@ BigUnsigned RNS::reverseConverter(vector<BigUnsigned> num_RNS, vector<BigUnsigne
         weights = weights_base1;
     else if (vectorsAreEqual(base, base2))
         weights = weights_base2;
-    else if (vectorsAreEqual(base, base2_no_mr))
-        weights = weights_base2_no_mr;
+    else if (vectorsAreEqual(base, base2_with_mr))
+        weights = weights_base2_with_mr;
     else
         weights = getConversionWeights(base);
 
     // Resolve conversion
-    BigUnsigned ret_val         = 0;
-    for (int i = 0; i < base.size(); i++) {  
+    BigUnsigned ret_val = 0;
+    for (int i = 0; i < base.size(); i++) {
         ret_val += weights[i] * num_RNS[i];
-        ret_val %= getDynamicRange(base);  
+        ret_val %= getDynamicRange(base);
     }
-    
+
     return BigUnsigned(ret_val);
 }
 
@@ -99,10 +193,61 @@ vector<BigUnsigned> RNS::getConversionWeights(vector<BigUnsigned> base) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// radix-2 Butterfly
+///////////////////////////////////////////////////////////////////////////////
+vector<BigUnsigned> RNS::butterfly(BigUnsigned left, BigUnsigned right, BigUnsigned twiddlefactor, BigUnsigned modulus) {
+
+    BigUnsigned product, left_out, right_out;
+
+    product = (right * twiddlefactor) % modulus;
+
+    left_out = (left + product) % modulus;
+    right_out = (left + modulus - product) % modulus;
+
+    return vector<BigUnsigned> {left_out, right_out};
+}
+///////////////////////////////////////////////////////////////////////////////
+// radix-2 RNS Butterfly
+///////////////////////////////////////////////////////////////////////////////
+vector<vector<BigUnsigned>> RNS::butterfly_rns(vector<BigUnsigned> left, vector<BigUnsigned> right, vector<BigUnsigned> twiddlefactor) {
+
+    vector<BigUnsigned> product, left_out, right_out;
+
+    product = modmult_RNS(right, twiddlefactor);
+
+    left_out = add_RNS(left, product, bases);
+
+    //PROBLEM: left and MM_product are of variable size due to MM in range [(2+alpha)M,(3+alpha)M] and left having similar range from previous cycle.
+    // Subtraction needs to be guarenteed to not be negative. Add parity check after subtractions in both directions, or magnitude check before subtraction.
+
+    // add_RNS will be between 
+    /*
+    for (int i = 0; i < bases.size() + 3; i++) {
+        left = add_RNS(left, M_rns, bases);
+    }
+    */
+
+    //magnitude check replacement
+    if (CORRECT_BF_SUBTRACTION_INPUT) {
+        BigUnsigned L = reverseConverter(left, bases);
+        BigUnsigned R = reverseConverter(product, bases);
+        L = (L % M) + M;
+        R = R % M;
+
+        left = forwardConverter(L, bases);
+        product = forwardConverter(R, bases);
+    }
+
+    right_out = sub_RNS(left, product, bases);
+
+    return vector<vector<BigUnsigned>> {left_out, right_out};
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // RNS montgomery reduction parameters
 
 /*
-Variable naming convention:
+Variable naming convention:f
 
  base1      - Moduli in the original base (size N)
  base2      - Moduli in the extended base (size N)
@@ -117,16 +262,16 @@ Variable naming convention:
  _red_i     - Means the value(s) are reduced by each ith modulus ( % base1[i])
  _red_j     - Means the value(s) are reduced by each jth modulus ( % base2[j])
  _red_r     - Means the value(s) are reduced by the r modulus    ( % m_r     )
- _inv_red_i - Modular inverse of D_i and the ith modulus, then reduced by ith modulus 
+ _inv_red_i - Modular inverse of D_i and the ith modulus, then reduced by ith modulus
 
 
- 
+
 Numbered based on alg 4.4 in "Modular Multiplication in the Residue Number System"
 starting with "pre-computed values".
 
  Translation from algorithm 4.4:
- 
- 1.  <D^-1>_mr    -  D1_inv_red_r 
+
+ 1.  <D^-1>_mr    -  D1_inv_red_r
  2.  <2^-1>_mr    -  two_inv_red_r
  3.  <M^-1>_mi    -  M_inv_red_i
  4.  <M>_mj       -  M_red_j
@@ -142,41 +287,41 @@ starting with "pre-computed values".
  Scheme kind of sucks but it is what it is.
 
  */
-///////////////////////////////////////////////////////////////////////////////
-// calculates constants and parameters for RNS montgomery reduction
+ ///////////////////////////////////////////////////////////////////////////////
+ // calculates constants and parameters for RNS montgomery reduction
 
-// all_bases holds the regular moduli (N), extended base (N), and redundant modulus (1). All coprime
-// needs called in main before using modmult()
-///////////////////////////////////////////////////////////////////////////////
+ // all_bases holds the regular moduli (N), extended base (N), and redundant modulus (1). All coprime
+ // needs called in main before using modmult()
+ ///////////////////////////////////////////////////////////////////////////////
 void RNS::initializeParameters(vector<BigUnsigned> moduli, BigUnsigned montgomery_reduction_modulus) {
 
- /*
- all parameters are generated by knowing:
-    n_moduli  - class variable, length of the core RNS base
-    all_bases - Concatenated vector of moduli, extended moduli, and r
-    modulus   - NTT modulus 
+    /*
+    all parameters are generated by knowing:
+       n_moduli  - class variable, length of the core RNS base
+       all_bases - Concatenated vector of moduli, extended moduli, and r
+       modulus   - NTT modulus
 
- As states on page 8-9 of "Modular Multiplication in the Residue Number System" -Kong09,
- D_i = D / m_i, D_i_inv_red_m_i = modinv(D_i,m_i). 
-  
-  
-  The j's need to start at zero because some algorithms use j = 0,...,k, 
-  however indexes of i are generally only needed from 0 to n_base1 and indexes on j
-  are only needed from n_base1 to total_bases.
-
-  I set all tables to start at zero. The only one to go until i + j + r is "bases". All others need j - n_base1 as an index
-  */
+    As states on page 8-9 of "Modular Multiplication in the Residue Number System" -Kong09,
+    D_i = D / m_i, D_i_inv_red_m_i = modinv(D_i,m_i).
 
 
- /*----- RNS bases and sizes ------*/
+     The j's need to start at zero because some algorithms use j = 0,...,k,
+     however indexes of i are generally only needed from 0 to n_base1 and indexes on j
+     are only needed from n_base1 to total_bases.
 
-    // Size of base1, base2, and total
-    int n_moduli    = (moduli.size() - 1) / 2;      //gets size of one base, given two bases and m_r.
-    n_base1         = n_moduli;
-    n_base2         = n_moduli + 1;  //holds redundant moduli
-    n_base2_no_mr   = n_moduli; 
-    total_bases     = n_base1 + n_base2;  
-    
+     I set all tables to start at zero. The only one to go until i + j + r is "bases". All others need j - n_base1 as an index
+     */
+
+
+     /*----- RNS bases and sizes ------*/
+
+        // Size of base1, base2, and total
+    int n_moduli = (moduli.size() - 1) / 2;      //gets size of one base, given two bases and m_r.
+    n_base1 = n_moduli;
+    n_base2 = n_moduli;
+    n_base2_with_mr = n_moduli + 1;
+    total_bases = n_base1 + n_base2 + 1;
+
     //save list of all bases 
     bases = moduli;
 
@@ -185,66 +330,79 @@ void RNS::initializeParameters(vector<BigUnsigned> moduli, BigUnsigned montgomer
         base1.push_back(bases[i]);
     }
 
-    // Extended base (vector BigUnsigned)
-    for (int j = n_base1; j < n_base1 + n_base2_no_mr; j++) {
-        base2_no_mr.push_back(bases[j]);
-    }
-
-    // Extended base + redundant modulus (vector BigUnsigned)
+    // Extended base (vector BigUnsigned) 
     for (int j = n_base1; j < n_base1 + n_base2; j++) {
         base2.push_back(bases[j]);
     }
 
+    // Extended base with m_r (vector BigUnsigned) 
+    for (int j = n_base1; j < total_bases; j++) {
+        base2_with_mr.push_back(bases[j]);
+    }
     // Redundant moduli (BigUnsigned)
-    m_r = bases[total_bases-1];
+    m_r = bases[total_bases - 1];
 
-    // create montgomery reduction module for each channel
+    // create montgomery or barrett reduction module for each channel
     for (int i = 0; i < total_bases; i++) {
         REDC redc_module(bases[i]);
         redc.push_back(redc_module);
     }
 
-/*----- Intermediate parameters ------*/
+    /*----- Intermediate parameters ------*/
 
-    // Reduction modulus (BigUnsigned)
-    M     = montgomery_reduction_modulus; 
+        // Reduction modulus (BigUnsigned)
+    M     = montgomery_reduction_modulus;
+    M_rns = forwardConverter(M, bases);
 
     // Dynamic range of base1- also montgomery number  (BigUnsigned)
     D1 = product(base1);
     D1_inv = modinv(D1, M); //inverse with respect to the reduction modulus 
-
-    // Dynamic range of base2 excluding m_r (BigUnsigned)
-    D2        = product(base2_no_mr);
+    D1_rns = forwardConverter(D1, bases);
+    // Dynamic range of base2 (BigUnsigned)
+    D2 = product(base2);
 
     //Modulus inverse with respect to dynamic range
-    M_inv = modinv(M, D1);   
+    M_inv = modinv(M, D1);
 
     //check if input conditions are correct (k = n channels, M = reduction modulus, D =  dynamic range 1, D' = dynamic range 2)
     int k = n_moduli;
 
-    bool cond1 = (M * (k + 2) * (k + 2)) < D1;
-    bool cond2 = (M * (k + 2)          ) < D2;
-    bool cond3 = (M * (base1[k-1] * (k + 2))) >= D1;
+    BigUnsigned res1 = (M * (k + 2) * (k + 2));
+    BigUnsigned res2 = (M * (k + 2));
+    BigUnsigned res3 = (M*(k + 2)) * (M*(k + 2)); // (M * (base1[k - 1] * (k + 2)));
 
-    if (cond1 && cond2 && cond3) 
+    bool cond1 = res1 < D1;
+    bool cond2 = res2 < D2;
+    bool cond3 = res3 < D1; //res3 >= D1;
+
+    if (cond1 && cond2 && cond3)
         cout << "Bajard conditions met." << endl;
-    else 
-        cout << "Bajard conditions not met." << endl;
-
+    if (!cond1) {
+        cout << "Bajard condition 1 not met: (M * (k + 2) * (k + 2)) < D1" << endl;
+        cout << "M,k, result < D1: " << M << " " << k << " " << res1 << " !< " << D1 << endl << endl;
+    }
+    if (!cond2) {
+        cout << "Bajard condition 2 not met: (M * (k + 2)) < D2" << endl;
+        cout << "M,k, result < D1: " << M << " " << k << " " << res2 << " !< " << D1 << endl << endl;
+    }
+    if (!cond3) {
+        cout << "Bajard condition 3 not met: (M * (base1[k-1] * (k + 2))) >= D1" << endl;
+        cout << "M,base1[k-1],k, result >= D1: " << M << " " << base1[k - 1] << " " << k << " " << res3 << " !>= " << D1 << endl << endl;
+    }
 
     // D1 divided by the ith modulus (vector BigUnsigned)
     for (int i = 0; i < n_base1; i++) {
         D1_i.push_back(D1 / base1[i]);
     }
 
-    // D2 divided by the jth modulus (vector BigUnsigned)
+    // D2 divided by the jth modulus (vector BigUnsigned) 
     for (int j = 0; j < n_base2; j++) {
         D2_j.push_back(D2 / base2[j]);
     }
- 
-/*----- Montgomery Reduction parameters  ------*/
 
-    // 1: Inverse of D1 and m_r, reduced by m_r (BigUnsigned) 
+    /*----- Montgomery Reduction parameters  ------*/
+
+        // 1: Inverse of D1 and m_r, reduced by m_r (BigUnsigned) 
     D1_inv_red_r = modinv(D1, m_r);
 
     // 2: Inverse of 2 and m_r, reduced by m_r (BigUnsigned) 
@@ -252,40 +410,53 @@ void RNS::initializeParameters(vector<BigUnsigned> moduli, BigUnsigned montgomer
 
     // 3: Inverse of M and the ith modulus, reduced by the ith modulus (vector BigUnsigned) 
     for (int i = 0; i < n_base1; i++) {
-        M_inv_red_i.push_back(modinv(M, base1[i])); 
+        M_inv_red_i.push_back(modinv(M, base1[i]));
     }
 
-    // 4: M reduced by the jth modulus (vector BigUnsigned) 
-    for (int j = 0; j < n_base2; j++) {
-        M_red_j.push_back(M % base2[j]);
+    // 4: M reduced by the jth modulus and m_r (vector BigUnsigned) - (In between base extensions)
+    for (int j = 0; j < n_base2_with_mr; j++) {
+        M_red_j.push_back(M % base2_with_mr[j]);
     }
 
     // 5: Inverse of D1_i and the ith modulus, reduced by the ith modulus (vector BigUnsigned) 
     for (int i = 0; i < n_base1; i++) {
         D1_i_inv_red_i.push_back(modinv(D1_i[i], base1[i]));
     }
-
-    // 6: Each D1_i reduced by each jth modulus (vector vector BigUnsigned)
+    
+    // 6: Each D1_i reduced by each jth modulus (vector vector BigUnsigned) (Used in Bajard)
     for (int i = 0; i < n_base1; i++) {
-        vector<BigUnsigned> j_elements;
-        for (int j = 0; j < n_base2; j++) {
-            j_elements.push_back(D1_i[i] % base2[j]);
+        vector<BigUnsigned> j_elements, j_elements2;
+        for (int j = 0; j < n_base2_with_mr; j++) {
+            j_elements.push_back(D1_i[i] % base2_with_mr[j]);
         }
         D1_i_red_j.push_back(j_elements);  //accessed in form D1_i_red_j[i][j]
     }
 
-    // 7: Each D2_j reduced by each ith modulus (vector vector BigUnsigned)
+    // 7: Each D2_j reduced by each ith modulus (vector vector BigUnsigned)    
+    // Correct version
     for (int j = 0; j < n_base2; j++) {
         vector<BigUnsigned> i_elements;
         for (int i = 0; i < n_base1; i++) {
-            i_elements.push_back(D2_j[j] % base1[i]); 
+            i_elements.push_back(D2_j[j] % base1[i]);  
         }
         D2_j_red_i.push_back(i_elements); //accessed in form D2_j_red_i[j][i]
     }
+        /* alternate correct
+     for (int j = 0; j < n_base2; j++) {
+         vector<BigUnsigned> i_elements;
+         for (int i = 0; i < n_base1; i++) {
+             i_elements.push_back(D2_j[j] % base1[i]);
+         }
+         D2_j_red_i.push_back(i_elements); //accessed in form D2_j_red_i[i][j]
+     }
+     */
+
+    
+   
 
     // 8: inverse of D2_j and the jth modulus, reduced by each jth modulus (vector BigUnsigned)
     for (int j = 0; j < n_base2; j++) {
-        D2_j_inv_red_j.push_back(modinv(D2_j[j], base2[j])); 
+        D2_j_inv_red_j.push_back(modinv(D2_j[j], base2[j]));
     }
 
     // 9: Each D2_j reduced by the r modulus (vector BigUnsigned)
@@ -298,13 +469,13 @@ void RNS::initializeParameters(vector<BigUnsigned> moduli, BigUnsigned montgomer
         D2_red_i.push_back(D2 % base1[i]);
     }
 
-    // 11: Inverse of D1 and the jth modulus, reduced by the jth modulus (vector BigUnsigned)
-    for (int j = 0; j < n_base2; j++) {
-        D1_inv_red_j.push_back(modinv(D1, base2[j])); 
+    // 11: Inverse of D1 and the jth modulus, reduced by the jth modulus and m_r (vector BigUnsigned) - (used in between base extensions)
+    for (int j = 0; j < n_base2_with_mr; j++) {
+        D1_inv_red_j.push_back(modinv(D1, base2_with_mr[j]));
     }
-  
+
     // 12: Inverse of D2 and the r modulus, reduced by the r modulus (BigUnsigned)
-    D2_inv_red_r = modinv(D2, m_r); 
+    D2_inv_red_r = modinv(D2, m_r);
 
     // Base 1 conversion weights
     /*for (int i = 0; i < n_base1; i++) {
@@ -312,21 +483,21 @@ void RNS::initializeParameters(vector<BigUnsigned> moduli, BigUnsigned montgomer
     }
     */
     // Base conversion weights (CANNOT combine into a single list of weights. Each of these are different.)
-    weights_bases       = getConversionWeights(bases);
-    weights_base1       = getConversionWeights(base1);
-    weights_base2       = getConversionWeights(base2);
-    weights_base2_no_mr = getConversionWeights(base2_no_mr);
+    weights_bases = getConversionWeights(bases);
+    weights_base1 = getConversionWeights(base1);
+    weights_base2 = getConversionWeights(base2);
+    weights_base2_with_mr = getConversionWeights(base2_with_mr);
 
     /*
     // Base 2 conversion weights
     for (int j = 0; j < n_base2; j++) {
         BigUnsigned a = (D2 * m_r) / base2[j];
         BigUnsigned b = modinv(a, base2[j]);
-        weights_extendedbase.push_back((a * b) % (D2 * m_r)); 
+        weights_extendedbase.push_back((a * b) % (D2 * m_r));
         */
         /*IMPORTANT: This needs to be written this way, instead of being a copy of the base 1 weight code. The values here that depend on D2 are recalculated to include
         m_r in the dynamic range (because all other code besides the forward/reverse converter do not include m_r as one of the bases). */
-    //}
+        //}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -336,10 +507,13 @@ void RNS::initializeParameters(vector<BigUnsigned> moduli, BigUnsigned montgomer
 void RNS::savetotextParameters() {
 
     // Original RNS moduli (vector BigUnsigned)
-    saveVectorToTextfile(base1,"Parameters/base1.txt");
+    saveVectorToTextfile(base1, "Parameters/base1.txt");
+
+    // Extended base (vector BigUnsigned)
+    saveVectorToTextfile(base2, "Parameters/base2.txt");
 
     // Extended base + redundant modulus (vector BigUnsigned)
-    saveVectorToTextfile(base2,"Parameters/base2.txt");
+    saveVectorToTextfile(base2_with_mr, "Parameters/base2_with_mr.txt");
 
     // Base 2 conversion weights
     saveVectorToTextfile(weights_extendedbase, "Parameters/weights_extendedbase.txt");
@@ -359,13 +533,13 @@ void RNS::savetotextParameters() {
 
 
 
-    // D1 divided by the ith modulus (vector BigUnsigned)
-    saveVectorToTextfile(D1_i, "Parameters/D1_i.txt");
-    
+     // D1 divided by the ith modulus (vector BigUnsigned)
+     saveVectorToTextfile(D1_i, "Parameters/D1_i.txt");
 
-    // D2 divided by the jth modulus (vector BigUnsigned)
-    saveVectorToTextfile(D2_j, "Parameters/D2_j.txt");
-    
+
+     // D2 divided by the jth modulus (vector BigUnsigned)
+     saveVectorToTextfile(D2_j, "Parameters/D2_j.txt");
+
 
     /*----- Montgomery Reduction parameters  ------*/
 
@@ -377,16 +551,16 @@ void RNS::savetotextParameters() {
 
     // 3: Inverse of M and the ith modulus, reduced by the ith modulus (vector BigUnsigned) 
     saveVectorToTextfile(M_inv_red_i, "Parameters/M_inv_red_i.txt");
-    
+
     // 4: M reduced by the jth modulus (vector BigUnsigned) 
     saveVectorToTextfile(M_red_j, "Parameters/M_red_j.txt");
-    
+
     // 5: Inverse of D1_i and the ith modulus, reduced by the ith modulus (vector BigUnsigned) 
     saveVectorToTextfile(D1_i_inv_red_i, "Parameters/D1_i_inv_red_i.txt");
-    
+
     // 6: Each D1_i reduced by each jth modulus (vector vector BigUnsigned)
     saveVectorVectorToTextfile(D1_i_red_j, "Parameters/D1_i_red_j.txt");
-    
+
     // 7: Each D2_j reduced by each ith modulus (vector vector BigUnsigned)
     saveVectorVectorToTextfile(D2_j_red_i, "Parameters/D2_j_red_i.txt");
 
@@ -421,12 +595,6 @@ vector<BigUnsigned> RNS::baseExtension1(vector<BigUnsigned> num_RNS, vector<BigU
 
     int n_base_in = base_in.size(), n_base_out = base_out.size();
 
-    /*
-    //zero pad j vectors - may want to move this to outer function so output isnt padded 
-    for (int i = 0; i < n_base; i++) {
-        num_RNS_new.push_back(1);
-    }
-    */
 
     // Calculate sigmas for each channel of the first base  
     for (int i = 0; i < n_base_in; i++) {                    //to be in parallel
@@ -434,9 +602,8 @@ vector<BigUnsigned> RNS::baseExtension1(vector<BigUnsigned> num_RNS, vector<BigU
     }
 
     //Compute each channel j of the new base + redundant channel (step 4)
-    for (int j = 0; j < n_base_out; j++) { //in parallel
+    for (int j = 0; j < n_base_out; j++) { //in parallel //ONLY CONSTANT THAT IS N_CHANNELS + 1, for M_R OUTPUT
         BigUnsigned t = 0;
-
         //accumulator, to occur on each channel
         for (int i = 0; i < n_base_in; i++) {
             t = (t + sigma[i] * D1_i_red_j[i][j]);
@@ -451,11 +618,58 @@ vector<BigUnsigned> RNS::baseExtension1(vector<BigUnsigned> num_RNS, vector<BigU
     return num_RNS_new;
 }
 
+void RNS::baseExtension1_UnitTest(int n_tests, bool SET_CONSTS_TO_ZERO) {
+    cout << "BAJARD UNIT INPUTS TEST" << endl << endl;
+
+    // Temporarily set constants in Bajard to 1
+    vector<BigUnsigned>         Const1_hold;
+    vector<vector<BigUnsigned>> Const2_hold;
+
+    if (SET_CONSTS_TO_ZERO) {
+        Const1_hold = D1_i_inv_red_i;
+        Const2_hold = D1_i_red_j;
+        cout << "Temporarily adjusting Bajard constants to 1..." << endl << endl;
+        for (int i = 0; i < n_base1; i++) {
+            D1_i_inv_red_i[i] = 1;
+        }
+        for (int j = 0; j < n_base2_with_mr; j++) {
+            for (int i = 0; i < n_base1; i++) {
+                D1_i_red_j[i][j] = 1;
+            }
+        }
+    }
+
+    // Begin test
+    
+    for (int i = 0; i < n_tests; i++) {
+        
+        vector<BigUnsigned> A;
+        /*
+        for (int j = 0; j < n_base1; j++){
+            A.push_back(i);
+        }
+        */
+        BigUnsigned a = 4294967087;
+        a += 4294967087 + i;
+        A = forwardConverter(a, base1);
+
+        vector<BigUnsigned> ans = baseExtension1(A, base1, base2_with_mr);
+        printVector(A, "input: ",true,true,32);
+        printVector(ans, "output:  ",true,true,32);
+        cout << endl;
+    }
+
+    // Reset constants 
+    if (SET_CONSTS_TO_ZERO) {
+        D1_i_inv_red_i = Const1_hold;
+        D1_i_red_j     = Const2_hold;
+    }
+}
 ///////////////////////////////////////////////////////////////////////////////
 // Base extension 2 (Shenoy) - From the extra base back to the original
 
 /*
-Input is size n_moduli + 1. 
+Input is size n_moduli + 1.
 Output is size n_moduli.
 
  M       - The modulus being reduced by in the montgomery reduction unit
@@ -474,52 +688,115 @@ Output is size n_moduli.
  ///////////////////////////////////////////////////////////////////////////////
 
  // Shenoy base extension
-vector<BigUnsigned> RNS::baseExtension2(vector<BigUnsigned> num_RNS, vector<BigUnsigned> base_in, vector<BigUnsigned> base_out) {
-    vector<BigUnsigned> E_j, new_num_RNS;
+vector<BigUnsigned> RNS::baseExtension2(vector<BigUnsigned> A, vector<BigUnsigned> base_in, vector<BigUnsigned> base_out) {
+    vector<BigUnsigned> E_j, Z;
     BigUnsigned beta;
 
     int n_base_in = base_in.size(), n_base_out = base_out.size();
 
     //step 1
     for (int j = 0; j < n_base_out; j++) {
-        E_j.push_back((num_RNS[j] * D2_j_inv_red_j[j]) % base_in[j]);
+        E_j.push_back((A[j] * D2_j_inv_red_j[j]) % base_in[j]); 
     }
 
     //step 2-4 (find t for m_r)
     BigUnsigned t = 0;
+
+   // cout << "D2_J_RED_R: ";
     for (int j = 0; j < n_base_out; j++) {
-        t = (t + (E_j[j] * D2_j_red_r[j])); //% m_r) % m_r;
+        t = (t + (E_j[j] * D2_j_red_r[j])); 
     }
-
     t %= m_r;
-    // t should be 0
-
+    
     //step 5 - only place (input mod m_r) is used! All loops dont use it
-    beta = (D2_inv_red_r * (t + m_r - num_RNS[n_base_in-1]) % m_r) % m_r;
-
-    // beta should be 1
-
+    beta = (D2_inv_red_r * (t + m_r - A[n_base_in - 1]) % m_r) % m_r;  //in algorithm, r is the intermediate MM value and original input to shenoy
+    
     //step 6-8 (find t for all j)
     vector<BigUnsigned> t_i;
+
     for (int i = 0; i < n_base_out; i++) {      //performed in parallel
         t = 0;
         for (int j = 0; j < n_base_out; j++) {
-            t = (t + E_j[j] * D2_j_red_i[j][i]);
-        }
+            t = (t + E_j[j] * D2_j_red_i[j][i]);     //BOTH ARE LENGTH N_CHANNELS, NOT INCLUDE M_R
 
+           // printVal(D2_j_red_i[j][i], " ", false, true, 32);
+        }
         t %= base_out[i];
 
         t_i.push_back(t);
     }
 
+    cout << endl;
+
+    //need in form: 
+    //{5-long j val (i = 0), 5 - long j val (val i = 1), 5 - long j val ( i = 2), 5 - long j val (i = 3)}
+    //{D2_j_red_i[j][0], D2_j_red_i[j][1], D2_j_red_i[j][2], D2_j_red_i[j][3]}
+
     //step 9
     for (int i = 0; i < n_base_out; i++) { //in parallel
-        new_num_RNS.push_back((t_i[i] + base_out[i] - (beta * D2_red_i[i]) % base_out[i]) % base_out[i]);
+        Z.push_back((t_i[i] + base_out[i] - (beta * D2_red_i[i]) % base_out[i]) % base_out[i]);
     }
 
-    return new_num_RNS;
+    //printVector(D2_red_i, "D2_RED_I: ", true, true, 32);
+
+    return Z;
 }
 
+void RNS::baseExtension2_UnitTest(int n_tests, bool SET_CONSTS_TO_ZERO) {
+    cout << "SHENOY UNIT INPUTS TEST" << endl << endl;
+
+    // Temporarily set constants in Bajard to 1
+    BigUnsigned Const1_hold;
+    vector<BigUnsigned>         Const2_hold, Const3_hold, Const4_hold;
+    vector<vector<BigUnsigned>> Const5_hold;
+
+    if (SET_CONSTS_TO_ZERO) {
+        Const1_hold = D2_inv_red_r;
+        Const2_hold = D2_red_i;
+        Const3_hold = D2_j_inv_red_j;
+        Const4_hold = D2_j_red_r;
+        Const5_hold = D2_j_red_i;
+           
+        cout << "Temporarily adjusting Shenoy constants to 1..." << endl << endl;
+
+        D2_inv_red_r = 1;
+
+        for (int i = 0; i < n_base1; i++) {
+            D2_red_i[i] = 1;
+        }
+        for (int j = 0; j < n_base2; j++) {
+            D2_j_inv_red_j[j] = 1;
+            D2_j_red_r[j] = 1;
+        }
+
+        for (int i = 0; i < n_base1; i++) {
+           for (int j = 0; j < n_base2_with_mr; j++) {
+              D2_j_red_i[j][i] = 1;
+            }
+        }
+    }
+
+    // Begin test
+    for (int i = 0; i < n_tests; i++) {
+        vector<BigUnsigned> A;
+        for (int j = 0; j < n_base2_with_mr; j++) {
+            A.push_back(i);
+        }
+        vector<BigUnsigned> ans = baseExtension2(A, base2_with_mr, base1);
+        printVector(A, "input: ", true, true, 32);
+        printVector(ans, "output:  ", true, true, 32);
+        cout << endl;
+    }
+
+    // Reset constants 
+    if (SET_CONSTS_TO_ZERO) {
+        D2_inv_red_r   = Const1_hold;
+        D2_red_i       = Const2_hold;
+        D2_j_inv_red_j = Const3_hold;
+        D2_j_red_r     = Const4_hold;
+        D2_j_red_i     = Const5_hold;
+    }
+}
 ///////////////////////////////////////////////////////////////////////////////
 /* Returns montgomery modular multiplication of RNS vectors
 Following "a full RNS implementation of RSA" by bajard
@@ -528,14 +805,20 @@ IMPORTANT: Requires inputs to be represented in both bases. They need to be the 
 */
 ///////////////////////////////////////////////////////////////////////////////
 vector<BigUnsigned> RNS::modmult_RNS(vector<BigUnsigned> A, vector<BigUnsigned> B) {
-    vector<BigUnsigned> X, ans, Q_i, Q_j, out_j, out_i;
+    vector<BigUnsigned> X, ans, Q_i, Q_j, Z_j, Z_i;
+
+    //Operating conditions
+       // 2*modulus less than dynamic range
+       // A * B < M * D1
 
     if ((A.size() != total_bases) || (B.size() != total_bases)) {
         cout << "ERROR: RNS::modmult_RNS requires both inputs to be represented in both bases. (length != total_bases)" << endl;
     }
 
-    // step 0  - get rid of montgomery factor 
-    A = mult_RNS(A, forwardConverter(D1,bases), bases);
+    // step 0  - get rid of montgomery factor if flag is set
+    if (MULTIPLY_MODMULT_INPUT_BY_D) {
+        A = mult_RNS(A, D1_rns, bases); //This doesn't make sense because D1 cannot be represented in base 1. But it results in correct answers.
+    }
 
     // step 1
     for (int i = 0; i < total_bases; i++) {
@@ -543,26 +826,39 @@ vector<BigUnsigned> RNS::modmult_RNS(vector<BigUnsigned> A, vector<BigUnsigned> 
     }
 
     // step 2 
-    for (int i = 0; i < n_base1; i++) {
-        Q_i.push_back((X[i] * M_inv_red_i[i]) % base1[i]); //M_inv_red_i should be negative
+    for (int i = 0; i < n_base1; i++) {                                            // IMPORTANT:
+        Q_i.push_back((base1[i] - (X[i] * M_inv_red_i[i]) % base1[i]) % base1[i]); // M_inv_red_i should be negative. This is the same as reducing the multiplication
+                                                                                   // and subtracting it from from base1[i] then reducing again.
     }
 
     // step 3 
-    Q_j = baseExtension1(Q_i, base1, base2);
-    
+    Q_j = baseExtension1(Q_i, base1, base2_with_mr);
+
     //step 4
-    for (int j = 0; j < n_base2; j++) {
-        out_j.push_back(((X[j + n_base1] + Q_j[j] * M_red_j[j]) * D1_inv_red_j[j]) % base2[j]);
+    for (int j = 0; j < n_base2_with_mr; j++) {
+        Z_j.push_back(((X[j + n_base1] + Q_j[j] * M_red_j[j]) * D1_inv_red_j[j]) % base2_with_mr[j]); // ONLY MMULT LOOP TO NEED M_R
     }
 
     //step 5
-    out_i = baseExtension2(out_j, base2, base1);
+    Z_i = baseExtension2(Z_j, base2_with_mr, base1);
+
     
+    //convert to fully reduce output 
+    if (CORRECT_MODMULT_OUTPUT) {
+        BigUnsigned i = reverseConverter(Z_i, base1);
+        BigUnsigned j = reverseConverter(Z_j, base2_with_mr);
+        i %= M;
+        j %= M;
+        Z_i = forwardConverter(i, base1);
+        Z_j = forwardConverter(j, base2_with_mr);
+    }
+    // NOTICE: Output without this is +1,2,3 alpha * M
+
 
     //edit to return concatenated both base results
-    out_i.insert(out_i.end(), out_j.begin(), out_j.end());
+    Z_i.insert(Z_i.end(), Z_j.begin(), Z_j.end());
 
-    return out_i;
+    return Z_i;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -572,7 +868,7 @@ vector<BigUnsigned> RNS::modmult_RNS(vector<BigUnsigned> A, vector<BigUnsigned> 
 ///////////////////////////////////////////////////////////////////////////////
 vector<vector<BigUnsigned>> RNS::forwardConverter_polynomial(vector<BigUnsigned> A, vector<BigUnsigned> base) {
     vector<vector<BigUnsigned>> A_rns;
-    
+
     // forward convert each polynomial element
     for (int i = 0; i < A.size(); i++) {
         A_rns.push_back(forwardConverter(A[i], base));
@@ -597,21 +893,24 @@ vector<BigUnsigned> RNS::reverseConverter_polynomial(vector<vector<BigUnsigned>>
 
 ///////////////////////////////////////////////////////////////////////////////
 // Tests forward and reverse converter
+
+// Generates random integers in the dynamic range of base 1. Forward convert to
+// RNS and reverse converts to integer form and compares to original integer. 
 ///////////////////////////////////////////////////////////////////////////////
-void RNS::converterTest(int n_tests){
+void RNS::converterTest(int n_tests) {
     int n_correct = 0;
 
     for (int i = 0; i < n_tests; i++) {
         cout << endl << endl << "Converter test: " << endl;
 
 
-        BigUnsigned ans = getRandomBigUnsigned(D1/2);
+        BigUnsigned ans = getRandomBigUnsigned(D1);
 
         vector<BigUnsigned> rns1 = forwardConverter(ans, base1);
-        vector<BigUnsigned> rns2 = forwardConverter(ans, base2);
+        vector<BigUnsigned> rns2 = forwardConverter(ans, base2_with_mr);
 
         BigUnsigned res1 = reverseConverter(rns1, base1);
-        BigUnsigned res2 = reverseConverter(rns2, base2);
+        BigUnsigned res2 = reverseConverter(rns2, base2_with_mr);
 
         cout << "Integer: " << ans << endl;
         printVector(rns1, "Forward RNS - base 1: ");
@@ -629,97 +928,220 @@ void RNS::converterTest(int n_tests){
     }
 
     cout << endl << n_correct << "/" << n_tests << " tests correct." << endl << endl;
- }
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 // RNS mod mult test
+
+// Generates random numbers in the range of modulus/2. modmult_RNS requires 
+// representation in both bases and returns a vector holding the independent
+// rns values in base1 and base2 + m_r. They are separated and converted independently,
+// then expected to both be equal to the directly computed montgomery reduction.
 ///////////////////////////////////////////////////////////////////////////////
 bool RNS::RNSmodmultTest(int n_tests) {
+    
     cout << "----------- RNS montgomery multiplication test ----------------" << endl;
-    int n_correct = 0;  
+    int n_correct = 0;
+    int n_reduced_correct1 = 0;
+    int n_reduced_correct2 = 0;
+
+    vector<BigUnsigned> alpha;
 
     for (int i = 0; i < n_tests; i++) {
         // Variables
-        BigUnsigned A, B, C, ans;
+        BigUnsigned A, B, C_base1, C_base2, ans;
         vector<BigUnsigned> A_rns, B_rns, C_rns;
-        
+
         // Random integers
-        A = getRandomBigUnsigned(M / 2);    //half of modulus
-        B = getRandomBigUnsigned(M / 2);
+        A = getRandomBigUnsigned(M);    //half of modulus
+        B = getRandomBigUnsigned(M);
 
         // Convert to RNS
-        BigUnsigned R = D1;        // multiplying by D1 gives true montgomery result
-        A_rns = forwardConverter(A * R, bases);
+        A_rns = forwardConverter(A, bases);  //must be represented in both bases for modmult to work 
         B_rns = forwardConverter(B, bases);
 
-        
         //test result
-        C_rns = modmult_RNS(A_rns, B_rns);           
-        C     = reverseConverter(C_rns, bases) % M;            
+        C_rns = modmult_RNS(A_rns, B_rns);
+
+        vector<BigUnsigned> C_rns_base2;
+        for (int i = n_base1; i < total_bases; i++) {
+            C_rns_base2.push_back(C_rns[i]);
+        }
+
+        C_base1 = reverseConverter(C_rns, base1);
+        C_base2 = reverseConverter(C_rns, base2_with_mr);
 
         // correct answer
-        ans = (A * B) % M;               
+         if (MULTIPLY_MODMULT_INPUT_BY_D) {
+            ans = (A * B) % M;
+            cout << "OUTPUT RESULTS ARE COMPARED TO EXPECTED FORM A*B % M (SET BY rns.MULTIPLY_MODMULT_INPUT_BY_D flag)" << endl;
+        }
+         else {    
+             ans = (A * B * modinv(D1, M)) % M;
+             cout << "OUTPUT RESULTS ARE COMPARED TO EXPECTED FORM A*B*D^-1 % M (SET BY rns.MULTIPLY_MODMULT_INPUT_BY_D flag)" << endl;
+         }
 
         //Compare if answers are equal
-        cout << "Result: " << A << " * " << B << " % " << M << " = " << C << endl;
+        cout << "Result: " << A << " * " << B << " % " << M << " = (base1: " << C_base1 << " base2: " << C_base2 << ")" << endl;
         cout << "Answer: " << A << " * " << B << " % " << M << " = " << ans << endl;
-        
-        if (ans == C) {
-            cout << "Correct." << endl << endl;
-            n_correct++;
+
+        if (ans == C_base1) {
+            cout << "Base1 correct." << endl;
+        }
+        else if (ans == C_base1 % M) {
+            cout << "Base1 incorrect unless reduced." << endl;
+            alpha.push_back((C_base1 - ans) / M);
+            n_reduced_correct1++;
         }
         else {
-            cout << "Incorrect." << endl << endl;
+            cout << "Base1 incorrect." << endl;
         }
 
+        if (ans == C_base2) {
+            cout << "Base2 correct." << endl << endl;
+        }
+        else if (ans == C_base2 % M) {
+            cout << "Base2 incorrect unless reduced." << endl << endl;
+            n_reduced_correct2++;
+        }
+        else {
+            cout << "Base2 incorrect." << endl << endl;
+        }
+        if (ans == C_base1 && ans == C_base2) {
+            n_correct++;
+            n_reduced_correct1++;
+            n_reduced_correct2++;
+        }
     }
+
+    printVector(alpha, "Moduli offset for each non-reduced result: ", true);
+    // The offset should always be less than (n_moduli-2).
+
+    cout << n_reduced_correct1 << "/" << n_tests << " base1 correct if reduced." << endl;
+    cout << n_reduced_correct2 << "/" << n_tests << " base2 correct if reduced." << endl;
     cout << n_correct << "/" << n_tests << " tests correct." << endl << endl;
     return true;
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// RNS Butterfly Test 
+
+// Tests random pairing of left and right inputs, comparing RNS arithmetic 
+// version and regular computation.
+
+// Caution: results are not reduced by M, unlike the actual butterfly. It is reduced
+// here but the true results will need reduced one final time.
+///////////////////////////////////////////////////////////////////////////////
+void RNS::butterflyRNStest(int n_tests) {
+    int n_correct = 0;
+    int l_correct = 0;
+    int r_correct = 0;
+
+    for (int i = 0; i < n_tests; i++) {
+        cout << endl << endl << "RNS butterfly test: " << endl;
+
+        BigUnsigned left  = getRandomBigUnsigned(M);
+        BigUnsigned right = getRandomBigUnsigned(M);
+        BigUnsigned twid  = getRandomBigUnsigned(M);
+
+        vector<BigUnsigned> left_rns  = forwardConverter(left, bases);
+        vector<BigUnsigned> right_rns = forwardConverter(right, bases);
+        vector<BigUnsigned> twid_rns  = forwardConverter(twid, bases);
+
+        vector<vector<BigUnsigned>> C_rns = butterfly_rns(left_rns, right_rns, twid_rns);
+        vector<BigUnsigned>         ans   = butterfly(left, right, twid, M);
+
+        BigUnsigned ans_left  = ans[0];
+        BigUnsigned ans_right = ans[1];
+
+        BigUnsigned C_left  = reverseConverter(C_rns[0], base1) % M;
+        BigUnsigned C_right = reverseConverter(C_rns[1], base1) % M;
+
+        cout << "Left, Right, twiddle values: " << left << " " << right << " " << twid << endl;
+
+        cout << "result: " << C_left << " " << C_right << endl;
+        cout << "answer: " << ans_left << " " << ans_right << endl;
+
+
+        if ((C_left == ans_left) && (C_right == ans_right)) {
+            cout << "Correct." << endl;
+            n_correct++;
+            l_correct++;
+            r_correct++;
+        }
+        else if (C_left == ans_left) {
+            cout << "Left correct. Right incorrect." << endl << endl;
+            l_correct++;
+        }
+        else if (C_right == ans_right) {
+            cout << "Left incorrect. Right correct." << endl << endl;
+            r_correct++;
+        }
+        else
+            cout << "Incorrect." << endl << endl;
+    }
+
+    cout << endl << l_correct << "/" << n_tests << " left tests correct." << endl;
+    cout << endl << r_correct << "/" << n_tests << " right tests correct." << endl;
+    cout << endl << n_correct << "/" << n_tests << " tests correct." << endl << endl;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Base extension tests
+
+// A random number in the range of base1 dynamic range is generated. It is converted to 
+// base2 using bajard, converted back to base1 using shenoy, and compared to the original correct 
+// integer (for both the value and reduced value). Partial error here is fixed when using 
+// base extension in combination with modmult. 75% accuracy here is replaced with 100% accuracy in 
+// modmultTest(), despite these same base extensions being used there. This is because the bajard extension
+// results in a multiply of D1, which is canceled in the in-between multiplication
 ///////////////////////////////////////////////////////////////////////////////
 bool RNS::baseExtensionTest(int n_tests) {
     cout << "Starting base extension test." << endl;
     printVector(base1, "From base: ", true);
-    printVector(base2, "To base: ", true); //new base needs to have a redundant modulus appended at input.
-                                       //Treat the last channel as m_r
-   
-    int n_correct = n_tests;
- 
+    printVector(base2_with_mr, "To base: ", true);
+
+    int n_correct = 0;
+    int n_correct2 = 0;
+
     for (int i = 0; i < n_tests; i++) {
-        //generate RNS number 
-        BigUnsigned              num = getRandomBigUnsigned(M); //In the range of modulus
+        //generate base1 RNS number 
+        BigUnsigned              num = getRandomBigUnsigned(D1/2); //In the range of Modulus dynamic range
         cout << "test integer:  " << num << endl;
         vector<BigUnsigned> num_rns = forwardConverter(num, base1);
 
-        printVector(num_rns, "Base 1 representation: ",true);
-        
+        printVector(num_rns, "Base 1 representation: ", true);
 
-        //extend using Bajard
-        vector<BigUnsigned> extension1 = RNS::baseExtension1(num_rns, base1, base2);
-        printVector(extension1, "Bajard representation: ",true);
 
-        //extend using Shenoy
-        vector<BigUnsigned> extension2 = RNS::baseExtension2(extension1, base2, base1);
-        printVector(extension2, "Shenoy re-conversion: ",true);
+        //extend to base2 using Bajard
+        vector<BigUnsigned> extension1 = RNS::baseExtension1(num_rns, base1, base2_with_mr);
+        printVector(extension1, "Bajard representation: ", true);
+
+
+
+        //extend back to base1 using Shenoy
+        vector<BigUnsigned> extension2 = RNS::baseExtension2(extension1, base2_with_mr, base1);
+        printVector(extension2, "Shenoy re-conversion: ", true);
 
         //check
         BigUnsigned result = reverseConverter(extension2, base1);
         cout << "Result: " << result << endl;
 
-        if (result == num)
+        if (result == num) {
             cout << "Correct." << endl << endl;
-        else if (result % M == num)
-            cout << "Reduced result correct." << endl << endl;
+            n_correct++;
+        }
+        if (result % M == num) {
+            cout << "Correct when reduced by M." << endl << endl;   //All reducable results are being counted as correct.
+            n_correct2++;
+        }
         else {
             cout << "Incorrect." << endl << endl;
-            n_correct -= 1;
         }
 
     }
 
-    cout << endl << "Test finished. " << n_correct << "/" << n_tests << " correct." <<  endl;
+    cout << endl << "Test finished. " << n_correct << "/" << n_tests << " correct. " << n_correct2 << "/" << n_tests << " correct when reduced by M." << endl;
 
     return true;
 }
@@ -729,38 +1151,43 @@ bool RNS::baseExtensionTest(int n_tests) {
 ///////////////////////////////////////////////////////////////////////////////
 bool RNS::shenoyTest(int n_tests) {
     cout << "Starting Shenoy base extension test." << endl << endl;
-    printVector(base2, "From base: ", true);
+    printVector(base2_with_mr, "From base: ", true);
     printVector(base1, "To base: ", true); //Initial base needs to have a redundant modulus appended at input.
                                        //Treat the last channel as m_r
 
-    int n_correct = n_tests;
+    int n_correct = 0;
+    int n_partially_correct = 0;
 
     for (int i = 0; i < n_tests; i++) {
         //generate RNS number 
-        BigUnsigned              num = getRandomBigUnsigned(M);
-        cout << "test integer:  " << num << endl;
-        vector<BigUnsigned> num_rns = forwardConverter(num, base2);
+        BigUnsigned              ans = getRandomBigUnsigned(D1/2);
+        cout << "test integer:  " << ans << endl;
+        vector<BigUnsigned> num_rns = forwardConverter(ans, base2_with_mr);
 
         printVector(num_rns, "Original RNS representation: ", true);
 
         //extend using Shenoy
-        vector<BigUnsigned> shenoy_result = RNS::baseExtension2(num_rns, base2, base1);
+        vector<BigUnsigned> shenoy_result = RNS::baseExtension2(num_rns, base2_with_mr, base1);
         printVector(shenoy_result, "Shenoy extension: ", true);
-        cout << "Integer result: " << reverseConverter(shenoy_result, base1) % M << endl;
 
         //check
-        vector<BigUnsigned> answer = forwardConverter(num, base1);
-        printVector(answer, "Correct representation: ", true);
+        BigUnsigned result = reverseConverter(shenoy_result, base1);
+        cout << "Integer result: " << result << endl;
 
-        if (vectorsAreEqual(shenoy_result, answer))
+        if (result == ans) {
             cout << "Correct." << endl << endl;
+            n_correct++;
+        }
+        if (result == ans % M) {
+            cout << "Correct if reduced." << endl << endl;
+            n_partially_correct++;
+        }
         else {
-            cout << "Incorrect." << endl << endl;
-            n_correct -= 1;
+            cout << "Incorrect." << endl << endl;            
         }
     }
 
-    cout << endl << "Test finished. " << n_correct << "/" << n_tests << " correct." << endl;
+    cout << endl << "Test finished. " << n_correct << "/" << n_tests << " correct. " << n_partially_correct << "/" << n_tests << " correct if reduced." << endl;
 
     return true;
 }
@@ -771,40 +1198,60 @@ bool RNS::shenoyTest(int n_tests) {
 bool RNS::bajardTest(int n_tests) {
     cout << "Starting Bajard base extension test." << endl << endl;
     printVector(base1, "From base: ", true);
-    printVector(base2, "To base: ", true); //Final base needs to have a redundant modulus appended at input.
+    printVector(base2_with_mr, "To base: ", true); //Final base needs to have a redundant modulus appended at input.
                                           //Treat the last channel as m_r
-    
-    int n_correct = n_tests;
+
+    int n_correct = 0;
+    int n_partially_correct = 0;
 
     for (int i = 0; i < n_tests; i++) {
         //generate RNS number 
-        BigUnsigned              num = getRandomBigUnsigned(M);
+        BigUnsigned              num = getRandomBigUnsigned(D1/2);
         cout << "test integer:  " << num << endl;
+        
         vector<BigUnsigned> num_rns = forwardConverter(num, base1);
 
         printVector(num_rns, "Original RNS representation: ", true);
 
         //extend using bajard
-        vector<BigUnsigned> bajard_result = RNS::baseExtension1(num_rns, base1, base2);
+        vector<BigUnsigned> bajard_result = RNS::baseExtension1(num_rns, base1, base2_with_mr);
         printVector(bajard_result, "Bajard extension: ", true);
 
-        BigUnsigned integer_result = reverseConverter(bajard_result, base2);
+        BigUnsigned integer_result = reverseConverter(bajard_result, base2_with_mr);
         cout << "Integer result: " << integer_result << endl;
 
         //check
-        if (integer_result == num)
-            cout << "Correct." << endl << endl;
-        else if (integer_result % M == num)                             //need to determine alpha offset to test
-            cout << "Reduced version correct." << endl << endl;
-        else {
-            cout << "Incorrect." << endl << endl;
-            n_correct -= 1;
+        if (integer_result == num) {
+            cout << "Exactly correct." << endl << endl;
+            n_correct++;
         }
+        if (integer_result % D1 == num) {                            //Bajard should be Q' = Q + alpha * D1 
+            cout << "Correct when reduced by D1." << endl << endl;
+            n_partially_correct++;
+        }
+        //else {
+        //    cout << "Incorrect." << endl << endl;
+        //}
     }
 
-    cout << endl << "Test finished. " << n_correct << "/" << n_tests << " correct." << endl;
+    cout << endl << "Test finished. " << n_correct << "/" << n_tests << " correct. " << n_partially_correct << "/" << n_tests << " correct if reduced." << endl;
 
     return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Modular arithmetic functions
+///////////////////////////////////////////////////////////////////////////////
+BigUnsigned RNS::MOD_ADD(BigUnsigned A, BigUnsigned B, BigUnsigned MOD) {
+    return (A + B) % MOD;
+}
+
+BigUnsigned RNS::MOD_SUB(BigUnsigned A, BigUnsigned B, BigUnsigned MOD) {
+    return (A + MOD - B) % MOD;
+}
+
+BigUnsigned RNS::MOD_MULT(BigUnsigned A, BigUnsigned B, BigUnsigned MOD) {
+    return (A * B) % MOD;
 }
 ///////////////////////////////////////////////////////////////////////////////
 // Returns addition of RNS vectors 
@@ -812,7 +1259,7 @@ bool RNS::bajardTest(int n_tests) {
 vector<BigUnsigned> RNS::add_RNS(vector<BigUnsigned> A, vector<BigUnsigned> B, vector<BigUnsigned> base) {
     vector<BigUnsigned> ret_val;
     for (int i = 0; i < base.size(); i++) {
-        ret_val.push_back((A[i] + B[i]) % base[i]);
+        ret_val.push_back(MOD_ADD(A[i], B[i], base[i])); 
     }
     return ret_val;
 }
@@ -822,11 +1269,14 @@ vector<BigUnsigned> RNS::add_RNS(vector<BigUnsigned> A, vector<BigUnsigned> B, v
 ///////////////////////////////////////////////////////////////////////////////
 vector<BigUnsigned> RNS::sub_RNS(vector<BigUnsigned> A, vector<BigUnsigned> B, vector<BigUnsigned> base) {
     vector<BigUnsigned> ret_val;
+
     for (int i = 0; i < base.size(); i++) {
-        ret_val.push_back((A[i] + base[i] - B[i]) % base[i]);
+        ret_val.push_back(MOD_SUB(A[i], B[i], base[i]));
     }
+
     return ret_val;
 }
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // Returns multiplication of RNS vectors (no reduction or overflow protection)
@@ -834,8 +1284,8 @@ vector<BigUnsigned> RNS::sub_RNS(vector<BigUnsigned> A, vector<BigUnsigned> B, v
 vector<BigUnsigned> RNS::mult_RNS(vector<BigUnsigned> A, vector<BigUnsigned> B, vector<BigUnsigned> base) {
     vector<BigUnsigned> ret_val;
 
-    for (int i = 0; i < base.size(); i++) {      
-        ret_val.push_back((A[i] * B[i]) % base[i]); //standard RNS multiplication
+    for (int i = 0; i < base.size(); i++) {
+        ret_val.push_back(MOD_MULT(A[i],B[i],base[i])); //standard RNS multiplication. Can be replaced with Barrett
     }
 
     return ret_val;
@@ -846,27 +1296,27 @@ vector<BigUnsigned> RNS::mult_RNS(vector<BigUnsigned> A, vector<BigUnsigned> B, 
 // Returns addition of integers converting to and from RNS
 ///////////////////////////////////////////////////////////////////////////////
 BigUnsigned RNS::add(BigUnsigned A, BigUnsigned B, vector<BigUnsigned> base) {
-    return reverseConverter(add_RNS(forwardConverter(A,base),forwardConverter(B,base),base),base);
+    return reverseConverter(add_RNS(forwardConverter(A, base), forwardConverter(B, base), base), base);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // Returns subtraction of integers converting to and from RNS
 ///////////////////////////////////////////////////////////////////////////////
 BigUnsigned RNS::sub(BigUnsigned A, BigUnsigned B, vector<BigUnsigned> base) {
-    return reverseConverter(sub_RNS(forwardConverter(A,base),forwardConverter(B,base),base),base);
+    return reverseConverter(sub_RNS(forwardConverter(A, base), forwardConverter(B, base), base), base);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // Returns multiplication of integers converting to and from RNS
 ///////////////////////////////////////////////////////////////////////////////
 BigUnsigned RNS::mult(BigUnsigned A, BigUnsigned B, vector<BigUnsigned> base) {
-    return reverseConverter(mult_RNS(forwardConverter(A,base),forwardConverter(B,base),base),base);
+    return reverseConverter(mult_RNS(forwardConverter(A, base), forwardConverter(B, base), base), base);
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // Prints results for the determine moduli functions
 /////////////////////////////////////////////////////////////////////////////
-void RNS::printModuliResults(int totalBits, vector<BigUnsigned> moduli) {
+void RNS::printModuliResults(int totalBits, vector<BigUnsigned> moduli, int n_moduli) {
     //print results
     printVector(moduli, "Chosen RNS moduli: ");
 
@@ -875,9 +1325,11 @@ void RNS::printModuliResults(int totalBits, vector<BigUnsigned> moduli) {
     for (int i = 0; i < moduli.size(); i++) {
         BigUnsigned val = moduli[i].bitLength();
         cout << val << " ";
-        sum += val;
+        if (i < n_moduli) {
+            sum += val;
+        }
     }
-    cout << "= " << sum << " bits" << endl;
+    cout << "= " << sum << " bits in base1." << endl;
     cout << "Modulus bits: " << totalBits / 2 << " bits" << endl;
     cout << "Necessary bits to prevent overflow: " << totalBits << " bits" << endl << endl;
 }
@@ -939,57 +1391,97 @@ vector<BigUnsigned> RNS::determineRNSmoduli2(int totalBits, int n_moduli, bool g
     BigUnsigned start = mod + 1;             //2^(bitsPer) + 1
     BigUnsigned end = mod << 1;            //2^(bitsPer+1) 
 
+    int n_mod = n_moduli;
     //return twice as many moduli if needing a redundant base (plus redundant channel m_r)
-    if (generate_redundant_base) n_moduli = n_moduli * 2 + 1;         
+    if (generate_redundant_base) n_mod = n_moduli * 2 + 1;
 
     for (mod = start; mod < end; mod += 2) {
         if (isCoprimeToVector(mod, moduli)) {
             moduli.push_back(mod);
         }
-        if (moduli.size() == n_moduli) {
-            printModuliResults(totalBits, moduli);
+        if (moduli.size() == n_mod) {
+            printModuliResults(totalBits, moduli, n_moduli);
             return moduli;
         }
     }
 
     cout << "Could not find " << n_moduli << " " << bitsPer << "-bit coprime numbers." << endl;
-    printModuliResults(totalBits, moduli);
+    printModuliResults(totalBits, moduli, n_moduli);
     return moduli;
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// Tests all RNS mult/addition
+// Tests all RNS mult/addition/subtraction.
+
+// RNS addition is operational as long as modulus M.
+
+// In the RNS butterfly, the general desire is to have all values wrapped to M
+// (which is done after the montgomery multiplication). The addition and 
+// multiplication results are raw and correct, however the 
+// subtraction result is only correct if reduced by M because sub_RNS adds 
+// M to the result to keep it positive (assuming two input values in [0,M])
 /////////////////////////////////////////////////////////////////////////////
-void RNS::RNS_test(RNS rns, bool mult) {
-    BigUnsigned val, ans;
-    BigUnsigned lim = rns.D1;
+void RNS::arithmetic_test(int n_tests) {
+    int n_correct = 0; //overall
+    int a_correct = 0; //addition
+    int s_correct = 0; //subtraction
+    int m_correct = 0; //multiplication
 
-    for (BigUnsigned i = 0; i < lim; i++) {
-        for (BigUnsigned j = 0; j < i; j++) {
+    for (int i = 0; i < n_tests; i++) {
+        cout << endl << "RNS arithmetic test " << i << ": " << endl;
 
-            if (mult) {
-                val = rns.mult(i, j, rns.bases);
-                ans = i * j;
-                if (val != ans) {
-                    cout << i << " * " << j << " = " << val << " != " << ans << endl;
-                    cout << "All values multiplying to " << ans - 1 << " with a dynamic range of " << rns.D1 << " calculated correctly." << endl;
-                    return;
-                }
-            }
 
-            else {
-                val = rns.add(i, j, rns.bases);
-                ans = i + j;
-                if (val != ans) {
-                    cout << i << " + " << j << " = " << val << " != " << ans << endl;
-                    cout << "All values summing to " << ans - 1 << " with a dynamic range of " << rns.D1 << " calculated correctly." << endl;
-                    return;
-                }
-            }
+        BigUnsigned left = getRandomBigUnsigned(M);
+        BigUnsigned right = getRandomBigUnsigned(M);
+
+        vector<BigUnsigned> left_rns = forwardConverter(left, base1);
+        vector<BigUnsigned> right_rns = forwardConverter(right, base1);
+
+        vector<BigUnsigned> a_res_rns = add_RNS(left_rns, right_rns, base1);
+        vector<BigUnsigned> s_res_rns = sub_RNS(left_rns, right_rns, base1);
+        vector<BigUnsigned> m_res_rns = mult_RNS(left_rns, right_rns, base1);
+
+        BigUnsigned a_res = reverseConverter(a_res_rns, base1);
+        BigUnsigned s_res = reverseConverter(s_res_rns, base1);
+        BigUnsigned m_res = reverseConverter(m_res_rns, base1);
+
+        BigUnsigned a_ans = left + right;
+        BigUnsigned s_ans = left + M - right;
+        BigUnsigned m_ans = left * right;
+
+
+        if (a_ans == a_res) {
+            cout << "Add correct. ";
+            a_correct++;
         }
+        else {
+            cout << "Add Incorrect. ";
+        }
+
+        if (s_ans == s_res) {
+            cout << "Subtraction correct. ";
+            s_correct++;
+        }
+        else {
+            cout << "Subtraction Incorrect. ";
+        }
+        if (m_ans == m_res) {
+            cout << "Multiplication correct. " << endl << endl;
+            m_correct++;
+        }
+        else {
+            cout << "Multiplication Incorrect. " << endl << endl;
+        }
+
+        if (a_ans == a_res && s_ans == s_res && m_ans == m_res)
+            n_correct++;
     }
 
-    cout << "All values up to " << lim << " with a dynamic range of " << rns.D1 << " calculated correctly." << endl;
+
+    cout << a_correct << "/" << n_tests << " add tests correct." << endl;
+    cout << s_correct << "/" << n_tests << " sub tests correct." << endl;
+    cout << m_correct << "/" << n_tests << " mult tests correct." << endl;
+    cout << endl << n_correct << "/" << n_tests << " tests correct." << endl << endl;
 }
 
 
@@ -998,5 +1490,5 @@ void RNS::RNS_test(RNS rns, bool mult) {
 ///////////////////////////////////////////////////////////////////////////////
 
 RNS::RNS() {
-   
+
 }

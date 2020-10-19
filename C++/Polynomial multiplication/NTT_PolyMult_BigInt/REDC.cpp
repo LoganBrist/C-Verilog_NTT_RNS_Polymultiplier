@@ -58,6 +58,67 @@ BigUnsigned REDC::modmult(BigUnsigned A, BigUnsigned B) {
 }
 
 //////////////////////////////////////////////////////////////
+// Barrett Multiplication
+//
+//
+
+// 
+//////////////////////////////////////////////////////////////
+BigUnsigned REDC::modmult_barrett(BigUnsigned A, BigUnsigned B) {
+	BigUnsigned Z = A * B;
+	BigUnsigned T = (Z * M) >> K;
+	Z = Z - (T * modulus);
+
+	if (Z >= modulus)
+		Z = Z - modulus;
+	return Z;
+}
+
+void REDC::getBarrettConstants(BigUnsigned mod) {
+	BigUnsigned M_temp = 0;
+	int K_temp = 0;
+
+	BigUnsigned Q = mod;
+	BigUnsigned P = pow(BigUnsigned(2), BigUnsigned(K_temp));
+
+
+	while (P * Q - P / Q * pow(Q, 2) >= P) {
+		K_temp++;
+		P = pow(BigUnsigned(2), BigUnsigned(K_temp));
+	}
+
+	M_temp = pow(BigUnsigned(2), BigUnsigned(K_temp)) / Q;
+	cout << "K: " << K_temp << " M: " << M_temp << endl;
+
+	M = M_temp;
+	K = K_temp;
+}
+
+void REDC::modmultTest_barrett(int n_tests) {
+	int n_correct = 0;
+
+	cout << endl << endl << "Barrett Multiplication Test: " << endl;
+	getBarrettConstants(modulus);
+
+	for (int i = 0; i < n_tests; i++) {
+		BigUnsigned A = getRandomBigUnsigned(modulus);
+		BigUnsigned B = getRandomBigUnsigned(modulus);
+
+		BigUnsigned res = modmult_barrett(A,B);
+
+		BigUnsigned ans = (A * B) % modulus;
+
+		if (res == ans) {
+			//cout << "Correct." << endl;
+			n_correct++;
+		}
+		else
+			cout << "Incorrect." << endl;
+	}
+
+	cout << endl << n_correct << "/" << n_tests << " tests correct." << endl << endl;
+}
+//////////////////////////////////////////////////////////////
 // Test all multiplications up to mod x mod
 //////////////////////////////////////////////////////////////
 bool REDC::test() {
@@ -124,7 +185,7 @@ REDC::REDC(BigUnsigned mod) {
 		R      = findR(mod);
 		R_inv  = mod_inverse(R, mod);
 		R_bits = R.bitLength() - 1;
-		K      = findK(R, R_inv, mod);
+		//K      = findK(R, R_inv, mod);
 	}
 	else {
 		R         = mod;

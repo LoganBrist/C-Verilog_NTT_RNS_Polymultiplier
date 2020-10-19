@@ -186,12 +186,17 @@ vector<BigUnsigned> negative_wrapped_convolution(vector<BigUnsigned> A, vector<B
 int main()
 {
     //Input parameters
-    BigUnsigned length = 8;                     /* Length of polynomial. Needs to be power of 2 and needs to be
+    BigUnsigned length = 8;                     /*4096 Length of polynomial. Needs to be power of 2 and needs to be
                                                 compatible with the chosen modulus otherwise errors occur. It is 
                                                 consistently 128,256,512 for moduli of 3329,7681,12289 in lattice
                                                 crptography papers and around 4096 (2^12) in FHE papers. */
 
-    BigUnsigned minimum_modulus = 12289;          /*673 The polynomial modulus. Has to be greater than the polynomial
+    //BigUnsigned base = 2;
+    //BigUnsigned exp = 64;
+    //BigUnsigned off = 59;
+    //BigUnsigned minimum_modulus = pow(base,exp) - off; 
+    
+    BigUnsigned minimum_modulus = 673;           /*673The polynomial modulus. Has to be greater than the polynomial
                                                 length and greater than each polynomial vector value. The value 
                                                 is possibly increased in ntt.new_modulus() to become prime. The
                                                 modulus 12289 (13.6 bits) is commonly used in lattice-based 
@@ -205,7 +210,7 @@ int main()
                                                 */
     
 
-    int n_moduli = 4;                        /* 3// Number of RNS channels. Increasing this number increases parallelism and reduces an N by N-bit
+    int n_moduli = 4;                        /*// Number of RNS channels. Increasing this number increases parallelism and reduces an N by N-bit
                                              multiplication (N = n_bits) into k smaller N/k x N/k multiplications (k = n_moduli). This is only true
                                              if each channel takes on an equal number of bits as in determineRNSmoduli2(dR_bits, n_moduli). The other
                                              moduli generating function determineRNSmoduli(dR_bits, n_moduli) looks for powers of 2 and will resultingly have
@@ -227,8 +232,11 @@ int main()
     int dR_bits = n_bits * 2;                   /* Number of bits needed covered by RNS operation. An RNS arithmetic operation needs to be able to multiply 
                                                 modulus x modulus without overflow, therefore the bit depth needs to be twice that of the minimum modulus. 
                                                 */
- 
+    //REDC barrett(111110509);
+    //barrett.modmultTest_barrett(100); 
+    //return 0;
 
+    
     //Calculates rns moduli, extended base, and m_r
     vector<BigUnsigned> bases;
     bases = {4294967291,4294967279,4294967231,4294967197,4294967189,4294967161,4294967143,4294967111, 4294967087}; //32 bit primes
@@ -244,10 +252,32 @@ int main()
                                                      */
 
     //rns.savetotextParameters();
+    //printVector(rns.D1_i_red_j[0], "const: ", true, true, 32);
     
-    //rns.converterTest(1000);
-    //rns.RNSmodmultTest(1000);
+    //rns.baseExtension1_UnitTest(10, false);
+    //rns.baseExtension2_UnitTest(10, false);
+    
+    //printVector(rns.D2_j_inv_red_j, "Const: ", true, true, 32);
+    //printVector(rns.D2_j_red_r , "Const: ", true, true, 32);
+    //printVal(rns.D2_inv_red_r, "Const: ", true, true, 32);
+    //printVector(rns.D2_red_i, "Const: ", true, true, 32);
+    //saveVectorVectorToTextfile(rns.D2_j_red_i,"D2_J_RED_I.txt", 32);
 
+    //return 0;
+
+    //rns.converterTest(100);     //convert to and from RNS:       100% accuracy
+    //rns.shenoyTest(100);
+    //rns.bajardTest(100);
+    //rns.baseExtensionTest(100); //base extends to base2 and back: 75% accuracy because result of bajard is a multiple of d1 (fixed when used in mod mult)
+    //rns.arithmetic_test(100);   // Tests +/-/*:                  100% accuracy (IF subtraction is reduced at some juncture) 
+    
+    rns.MULTIPLY_MODMULT_INPUT_BY_D  = true;   // Multiply modmult input by correction factor to get A*B. or let result be A*B*D^-1 if false.
+    rns.CORRECT_MODMULT_OUTPUT       = false;  // Reduce modmult output again to get fully reduced result  
+    rns.CORRECT_BF_SUBTRACTION_INPUT = true;   // Decides whether to reduce input to butterfly subtraction (as that is the overflow problem)
+
+    //rns.RNSmodmultTest(100);    //RNS montgomery reduction outputs answer + (k*n_moduli+2)M. Test for A*B or A*B*D^-1 depeneding on MULTIPLY_MODMULT_INPUT_BY_D flag.  
+    rns.butterflyRNStest(100);    //Tests RNS butterfly:           100% accuracy if modmult is corrected.
+    return 0;
                                                                      /* 
                                                                      Must have RNS dynamic range > modulus^2 for RNS multiplication. 
                                                                      The dR is multiplied by (w_n)^i in RNS.reverseconverter(), so caution with 
@@ -258,12 +288,11 @@ int main()
 
 
     // Create NTT & RNS systems
-    
-    NTT ntt_system(length, minimum_modulus, rns, true); //it is important to use a prime as the minimum modulus if it is large. It will search for a new prime O.W.
-    //ntt_system.printParameters();
+    NTT ntt(length, minimum_modulus, rns, true); //it is important to use a prime as the minimum modulus if it is large. It will search for a new prime O.W.
+    //ntt.printParameters();
 
-
-   ntt_system.NTT_test(10);
+    //ntt.CORRECT_LAST_NTT_RUN = true;// true; //enables CORRECT_MODMULT_OUTPUT on last stage of NTT
+    //ntt.NTT_test(100);         //RNS NTT has 100% accuracy when compared to all other NTTs.
     
     return 0;
 
